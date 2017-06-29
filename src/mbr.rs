@@ -3,14 +3,11 @@
 Support for reading MBR (not GPT) partition tables, and getting an `io::Read` for a partition.
 */
 
-use std;
-
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Result;
 use std::io::Seek;
-use std::io::SeekFrom;
 
 use byteorder::{ByteOrder, LittleEndian};
 

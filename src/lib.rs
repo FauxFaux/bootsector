@@ -1,4 +1,4 @@
 extern crate byteorder;
 
-mod mbr;
+pub mod mbr;
 mod rangereader;
