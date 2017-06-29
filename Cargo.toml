@@ -1,0 +1,13 @@
+[package]
+name = "bootsector"
+version = "0.1.0"
+authors = ["Chris West (Faux) <git@goeswhere.com>"]
+
+description = "Read partitions from block devices or files"
+repository = "https://github.com/FauxFaux/bootsector"
+readme = "README.md"
+categories = ["filesystem", "os", "parsing"]
+license = "MIT"
+
+[dependencies]
+byteorder = "1.0.0"
