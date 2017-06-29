@@ -28,7 +28,8 @@ impl<R: Seek> RangeReader<R> {
 }
 
 impl<R> Read for RangeReader<R>
-    where R: Read + Seek
+where
+    R: Read + Seek,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let pos = self.inner.seek(SeekFrom::Current(0))? - self.first_byte;
@@ -46,7 +47,8 @@ impl<R: Seek> Seek for RangeReader<R> {
 
         let new_pos = self.inner.seek(match action {
             SeekFrom::Start(dist) => SeekFrom::Start(
-                self.first_byte.checked_add(dist).expect("start overflow")),
+                self.first_byte.checked_add(dist).expect("start overflow"),
+            ),
             SeekFrom::Current(dist) => SeekFrom::Current(dist),
             SeekFrom::End(dist) => {
                 assert!(dist <= 0, "can't seek positively at end");
@@ -55,9 +57,14 @@ impl<R: Seek> Seek for RangeReader<R> {
             }
         })?;
 
-        assert!(new_pos >= self.first_byte && new_pos < self.first_byte + self.len,
-        "out of bound seek: {:?} must leave us between {} and {}, but was {}",
-        action, self.first_byte, self.len, new_pos);
+        assert!(
+            new_pos >= self.first_byte && new_pos < self.first_byte + self.len,
+            "out of bound seek: {:?} must leave us between {} and {}, but was {}",
+            action,
+            self.first_byte,
+            self.len,
+            new_pos
+        );
 
         Ok(new_pos - self.first_byte)
     }

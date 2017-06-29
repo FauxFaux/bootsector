@@ -48,9 +48,16 @@ pub fn parse_partition_table(sector: &[u8], sector_size: u16) -> Result<Vec<Part
         let bootable = match status {
             0x00 => false,
             0x80 => true,
-            _ => return Err(Error::new(ErrorKind::InvalidData,
-                                           format!("invalid status code in partition {}: {:x}",
-                                                   entry_id, status))),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!(
+                        "invalid status code in partition {}: {:x}",
+                        entry_id,
+                        status
+                    ),
+                ))
+            }
         };
 
         let type_code = partition[4];
@@ -76,7 +83,8 @@ pub fn parse_partition_table(sector: &[u8], sector_size: u16) -> Result<Vec<Part
 
 /// Open the contents of a partition for reading.
 pub fn read_partition<R>(inner: R, part: &Partition) -> Result<RangeReader<R>>
-where R: Read + Seek
+where
+    R: Read + Seek,
 {
     RangeReader::new(inner, part.first_byte, part.len)
 }
@@ -85,8 +93,10 @@ where R: Read + Seek
 mod tests {
     #[test]
     fn parse() {
-        let parts = ::mbr::parse_partition_table(include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img"), 512)
-            .expect("success");
+        let parts = ::mbr::parse_partition_table(
+            include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img"),
+            512,
+        ).expect("success");
 
         assert_eq!(2, parts.len());
 
