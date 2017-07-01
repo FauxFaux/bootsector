@@ -40,7 +40,7 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
         }
 
         let first_byte = LittleEndian::read_u32(&partition[8..]) as u64 * SECTOR_SIZE as u64;
-        let len = first_byte + LittleEndian::read_u32(&partition[12..]) as u64 * SECTOR_SIZE as u64;
+        let len = LittleEndian::read_u32(&partition[12..]) as u64 * SECTOR_SIZE as u64;
 
         partitions.push(Partition {
             id: entry_id,
