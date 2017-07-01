@@ -12,3 +12,6 @@ license = "MIT"
 [dependencies]
 byteorder = "1.0.0"
 crc = "1.0.0"
+
+[badges]
+travis-ci = { repository = "FauxFaux/bootsector" }
