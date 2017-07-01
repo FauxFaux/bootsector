@@ -1,8 +1,3 @@
-/*!
-
-Support for reading MBR (not GPT) partition tables, and getting an `io::Read` for a partition.
-*/
-
 use std::io::Error;
 use std::io::ErrorKind;
 use std::io::Result;

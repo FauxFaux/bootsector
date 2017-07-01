@@ -1,3 +1,37 @@
+//! Read basic MBR and GPT partition tables from a reader.
+//!
+//! # Examples
+//!
+//! Load MBR or GPT partitions from a `reader`:
+//!
+//! ```rust
+//! use std::io;
+//! use bootsector::{list_partitions, open_partition, Options, Attributes};
+//!
+//! # fn go<R>(mut reader: R) -> io::Result<()>
+//! # where R: io::Read + io::Seek {
+//! // let reader = ...;
+//! let partitions = list_partitions(&mut reader, &Options::default())?;
+//! let part = &partitions[0];
+//!
+//! // See what type of partition this is
+//! match part.attributes {
+//!     Attributes::GPT {
+//!         type_uuid,
+//!         ..
+//!     } => println!("gpt: {:?}", type_uuid),
+//!     Attributes::MBR {
+//!         type_code,
+//!         ..
+//!     } => println!("mbr: {:x}", type_code),
+//! }
+//!
+//! let part_reader = open_partition(reader, part);
+//! // part_reader.read_exact(...
+//! # Ok(())
+//! # }
+//! ```
+
 extern crate byteorder;
 extern crate crc;
 
@@ -9,6 +43,7 @@ mod rangereader;
 
 use rangereader::RangeReader;
 
+/// Table-specific information about a partition.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Attributes {
@@ -27,12 +62,20 @@ pub enum Attributes {
 /// An entry in the partition table.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Partition {
+    /// The number of this partition, 0-indexed.
     pub id: usize,
+
+    /// The first byte of the reader that this partition represents.
     pub first_byte: u64,
-    pub attributes: Attributes,
+
+    /// The length of this partition, in bytes.
     pub len: u64,
+
+    /// Table-specific attributes about this partition.
+    pub attributes: Attributes,
 }
 
+/// What type of MBR partition tables should we attempt to read?
 pub enum ReadMBR {
     /// A compliant, modern MBR: CHS addressing is correctly set to the blind value.
     Modern,
@@ -40,6 +83,7 @@ pub enum ReadMBR {
     Never,
 }
 
+/// What type of GPT partition tables should we attempt to read?
 pub enum ReadGPT {
     /// A valid GPT partition table as of revision 1 (2010-2017 and counting)
     RevisionOne,
@@ -48,6 +92,7 @@ pub enum ReadGPT {
     Never,
 }
 
+/// Settings for handling sector size
 pub enum SectorSize {
     /// Attempt to identify a valid GPT partition table at various locations, and use this
     /// information to derive the sector size. For MBR, it's very likely that 512 is a safe
@@ -58,13 +103,21 @@ pub enum SectorSize {
     Known(u16),
 }
 
+/// Configuration for listing partitions.
 pub struct Options {
+    /// What type of MBR partitions should we read?
     pub mbr: ReadMBR,
+
+    /// What type of GPT partitions should we read?
     pub gpt: ReadGPT,
+
+    /// How should we handle sector sizes?
     pub sector_size: SectorSize,
 }
 
 impl Default for Options {
+    /// The default options are to read any type of modern partition table,
+    /// having guessed the sector size.
     fn default() -> Self {
         Options {
             mbr: ReadMBR::Modern,
@@ -74,6 +127,16 @@ impl Default for Options {
     }
 }
 
+/// Read the list of partitions.
+///
+/// # Returns
+///
+/// * A possibly empty list of partitions.
+/// * `ErrorKind::NotFound` if the boot magic is not found,
+///        or you asked for partition types that are not there
+/// * `ErrorKind::InvalidData` if anything is not as we expect,
+///       including it looking like there should be GPT but its magic is missing.
+/// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
 pub fn list_partitions<R>(mut reader: R, options: &Options) -> io::Result<Vec<Partition>>
 where
     R: io::Read + io::Seek,
