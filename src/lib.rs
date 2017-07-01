@@ -106,18 +106,3 @@ where
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use open;
-    use std::fs;
-    use std::io::Read;
-    use std::io::Seek;
-    #[test]
-    fn parse() {
-        open(
-            fs::File::open("src/test-data/4t-gpt.img").unwrap(),
-            &::Options::default(),
-        ).unwrap();
-    }
-}

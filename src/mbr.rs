@@ -81,27 +81,3 @@ where
 {
     RangeReader::new(inner, part.first_byte, part.len)
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn parse() {
-        let parts = ::mbr::parse_partition_table(
-            include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img")
-        ).expect("success");
-
-        assert_eq!(2, parts.len());
-
-        assert_eq!(0, parts[0].id);
-//        assert_eq!(true, parts[0].bootable);
-//        assert_eq!(12, parts[0].type_code);
-        assert_eq!(4194304, parts[0].first_byte);
-        assert_eq!(138412032, parts[0].len);
-
-        assert_eq!(1, parts[1].id);
-//        assert_eq!(false, parts[1].bootable);
-//        assert_eq!(131, parts[1].type_code);
-        assert_eq!(138412032, parts[1].first_byte);
-        assert_eq!(3999268864, parts[1].len);
-    }
-}
