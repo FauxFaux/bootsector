@@ -93,7 +93,13 @@ where
 
     match header_table.len() {
         1 if gpt::is_protective(&header_table[0]) => {}
-        _ => return Ok(header_table),
+        _ => {
+            return match options.mbr {
+                ReadMBR::Modern => Ok(header_table),
+                ReadMBR::Never => Err(io::ErrorKind::NotFound.into()),
+            }
+        }
+
     }
 
     match options.gpt {

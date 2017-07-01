@@ -104,6 +104,38 @@ fn ubu_raspi() {
     assert_eq!(3999268864, parts[1].len);
 }
 
+#[test]
+fn require_mbr() {
+    let mut options = Options::default();
+    options.gpt = bootsector::ReadGPT::Never;
+
+    let parts = list_partitions(cursor(include_bytes!("test-data/4t-gpt.img")), &options).unwrap();
+
+    assert_eq!(1, parts.len());
+    match parts[0].attributes {
+        Attributes::MBR {
+            type_code,
+            bootable: _,
+        } => assert_eq!(0xEE, type_code),
+        _ => panic!("not a protective partition on a gpt volume"),
+    }
+}
+
+#[test]
+fn require_gpt() {
+    let mut options = Options::default();
+    options.mbr = bootsector::ReadMBR::Never;
+
+    assert_eq!(
+        io::ErrorKind::NotFound,
+        list_partitions(
+            cursor(include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img")),
+            &options,
+        ).unwrap_err()
+            .kind()
+    );
+}
+
 fn cursor(bytes: &[u8]) -> io::Cursor<&[u8]> {
     io::Cursor::new(bytes)
 }
