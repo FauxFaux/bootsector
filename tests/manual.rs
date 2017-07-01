@@ -6,6 +6,27 @@ use bootsector::list_partitions;
 use bootsector::Attributes;
 use bootsector::Options;
 
+
+#[test]
+fn four_tee_gpt() {
+    let parts = list_partitions(
+        cursor(include_bytes!("test-data/4t-gpt.img")),
+        &Options::default(),
+    ).expect("success");
+
+    assert_eq!(2, parts.len());
+
+    assert_eq!(0, parts[0].id);
+    assert_eq!(1024 * 1024, parts[0].first_byte);
+    assert_eq!(3_000_999_346_176, parts[0].len);
+
+    assert_eq!(1, parts[1].id);
+    assert_eq!(3_001_000_394_752, parts[1].first_byte);
+    assert_eq!(999_786_618_368, parts[1].len);
+
+    // TODO: uuids
+}
+
 #[test]
 fn ubu_raspi() {
     let parts = list_partitions(
