@@ -7,6 +7,8 @@ mod gpt;
 mod mbr;
 mod rangereader;
 
+use rangereader::RangeReader;
+
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Attributes {
@@ -72,7 +74,7 @@ impl Default for Options {
     }
 }
 
-pub fn open<R>(mut reader: R, options: &Options) -> io::Result<Vec<Partition>>
+pub fn list_partitions<R>(mut reader: R, options: &Options) -> io::Result<Vec<Partition>>
 where
     R: io::Read + io::Seek,
 {
@@ -105,4 +107,12 @@ where
             gpt::read(reader, sector_size)
         }
     }
+}
+
+/// Open the contents of a partition for reading.
+pub fn open_partition<R>(inner: R, part: &Partition) -> io::Result<RangeReader<R>>
+where
+    R: io::Read + io::Seek,
+{
+    RangeReader::new(inner, part.first_byte, part.len)
 }

@@ -5,26 +5,13 @@ Support for reading MBR (not GPT) partition tables, and getting an `io::Read` fo
 
 use std::io::Error;
 use std::io::ErrorKind;
-use std::io::Read;
 use std::io::Result;
-use std::io::Seek;
 
 use byteorder::{ByteOrder, LittleEndian};
-
-use rangereader::RangeReader;
 
 use Partition;
 
 const SECTOR_SIZE: usize = 512;
-
-/// Read a DOS/MBR partition table from a reader positioned at the appropriate sector.
-/// The sector size for the disc is assumed to be 512 bytes.
-pub fn read_partition_table<R: Read>(mut reader: R) -> Result<Vec<Partition>> {
-    let mut sector = [0u8; SECTOR_SIZE];
-    reader.read_exact(&mut sector)?;
-
-    parse_partition_table(&sector)
-}
 
 /// Read a DOS/MBR partition table from a 512-byte boot sector, providing a disc sector size.
 pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition>> {
@@ -72,12 +59,4 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
     }
 
     Ok(partitions)
-}
-
-/// Open the contents of a partition for reading.
-pub fn read_partition<R>(inner: R, part: &Partition) -> Result<RangeReader<R>>
-where
-    R: Read + Seek,
-{
-    RangeReader::new(inner, part.first_byte, part.len)
 }

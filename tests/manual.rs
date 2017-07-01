@@ -2,13 +2,13 @@ extern crate bootsector;
 
 use std::io;
 
-use bootsector::open;
+use bootsector::list_partitions;
 use bootsector::Attributes;
 use bootsector::Options;
 
 #[test]
 fn ubu_raspi() {
-    let parts = open(
+    let parts = list_partitions(
         cursor(include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img")),
         &Options::default(),
     ).expect("success");
@@ -24,7 +24,7 @@ fn ubu_raspi() {
             assert_eq!(true, bootable);
             assert_eq!(12, type_code);
         }
-        _ => panic!()
+        _ => panic!(),
     }
     assert_eq!(4194304, parts[0].first_byte);
     assert_eq!(138412032, parts[0].len);
@@ -38,7 +38,7 @@ fn ubu_raspi() {
             assert_eq!(false, bootable);
             assert_eq!(131, type_code);
         }
-        _ => panic!()
+        _ => panic!(),
     }
 
     assert_eq!(138412032, parts[1].first_byte);
