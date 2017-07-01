@@ -27,6 +27,24 @@ fn four_tee_gpt() {
     // TODO: uuids
 }
 
+
+#[test]
+fn fdisk_1m_part() {
+    let parts = list_partitions(
+        cursor(include_bytes!("test-data/fdisk-1m-part.img")),
+        &Options::default(),
+    ).expect("success");
+
+    assert_eq!(1, parts.len());
+
+    assert_eq!(0, parts[0].id);
+    assert_eq!(34 * 512, parts[0].first_byte);
+    assert_eq!(1024 * 1024, parts[0].len);
+
+    // TODO: uuids
+}
+
+
 #[test]
 fn fdisk_empty_gpt() {
     let parts = list_partitions(
