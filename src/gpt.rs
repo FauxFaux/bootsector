@@ -11,7 +11,7 @@ use crc::crc32::checksum_ieee;
 use Attributes;
 use Partition;
 
-pub fn protective(partition: &Partition) -> bool {
+pub fn is_protective(partition: &Partition) -> bool {
     let protective_type = 0xee;
     let maximum_sector_size = 16 * 1024;
     let sector_size_guess = partition.first_byte;
