@@ -28,6 +28,26 @@ fn four_tee_gpt() {
 }
 
 #[test]
+fn fdisk_empty_gpt() {
+    let parts = list_partitions(
+        cursor(include_bytes!("test-data/fdisk-empty-gpt.img")),
+        &Options::default(),
+    ).expect("success");
+
+    assert_eq!(0, parts.len());
+}
+
+#[test]
+fn fdisk_empty_mbr() {
+    let parts = list_partitions(
+        cursor(include_bytes!("test-data/fdisk-empty-mbr.img")),
+        &Options::default(),
+    ).expect("success");
+
+    assert_eq!(0, parts.len());
+}
+
+#[test]
 fn ubu_raspi() {
     let parts = list_partitions(
         cursor(include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img")),
