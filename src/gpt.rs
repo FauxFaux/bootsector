@@ -8,8 +8,8 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crc::crc32::checksum_ieee;
 
-use ::Attributes;
-use ::Partition;
+use Attributes;
+use Partition;
 
 pub fn protective(partition: &Partition) -> bool {
     let protective_type = 0xee;
@@ -25,13 +25,14 @@ pub fn protective(partition: &Partition) -> bool {
         _ => return false,
     };
 
-    0 == partition.id &&
-        partition.first_byte <= maximum_sector_size &&
+    0 == partition.id && partition.first_byte <= maximum_sector_size &&
         partition.len >= minimum_gpt_length
 }
 
 pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
-    where R: io::Read + io::Seek {
+where
+    R: io::Read + io::Seek,
+{
 
     reader.seek(io::SeekFrom::Start(sector_size as u64))?;
 
@@ -63,11 +64,17 @@ pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
     }
 
     if 0 != LittleEndian::read_u32(&lba1[0x14..0x18]) {
-        return Err(Error::new(InvalidData, "unsupported data in reserved field 0x0c"));
+        return Err(Error::new(
+            InvalidData,
+            "unsupported data in reserved field 0x0c",
+        ));
     }
 
     if 1 != LittleEndian::read_u64(&lba1[0x18..0x20]) {
-        return Err(Error::new(InvalidData, "current lba must be '1' for first header"));
+        return Err(Error::new(
+            InvalidData,
+            "current lba must be '1' for first header",
+        ));
     }
 
     // backup lba [ignored]
@@ -80,15 +87,20 @@ pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
     }
 
     if last_usable_lba > (std::u64::MAX / sector_size as u64) {
-        return Err(Error::new(InvalidData,
-                              "everything must be below the 2^64 point (~ eighteen million TB)"));
+        return Err(Error::new(
+            InvalidData,
+            "everything must be below the 2^64 point (~ eighteen million TB)",
+        ));
     }
 
     let mut guid = [0u8; 16];
     guid.copy_from_slice(&lba1[0x38..0x48]);
 
     if 2 != LittleEndian::read_u64(&lba1[0x48..0x50]) {
-        return Err(Error::new(InvalidData, "starting lba must be '2' for first header"));
+        return Err(Error::new(
+            InvalidData,
+            "starting lba must be '2' for first header",
+        ));
     }
 
     let entries = LittleEndian::read_u32(&lba1[0x50..0x54]);
@@ -113,7 +125,10 @@ pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
     let table_crc = LittleEndian::read_u32(&lba1[0x58..0x5c]);
 
     if !all_zero(&lba1[header_size as usize..]) {
-        return Err(Error::new(InvalidData, "reserved header tail is not all empty"));
+        return Err(Error::new(
+            InvalidData,
+            "reserved header tail is not all empty",
+        ));
     }
 
     let mut table = vec![0u8; entry_size * entries];
@@ -151,7 +166,10 @@ pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
         let name = match String::from_utf16(&name_le) {
             Ok(name) => name,
             Err(e) => {
-                return Err(Error::new(InvalidData, format!("partition {} has an invalid name: {:?}", id, e)));
+                return Err(Error::new(
+                    InvalidData,
+                    format!("partition {} has an invalid name: {:?}", id, e),
+                ));
             }
         };
 
@@ -164,7 +182,7 @@ pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
                 partition_uuid,
                 attributes,
                 name,
-            }
+            },
         });
     }
 
@@ -179,8 +197,9 @@ use std::convert::AsMut;
 
 /// https://stackoverflow.com/questions/37678698/function-to-build-a-fixed-sized-array-from-slice/37679019#37679019
 fn clone_into_array<A, T>(slice: &[T]) -> A
-    where A: Sized + Default + AsMut<[T]>,
-          T: Clone
+where
+    A: Sized + Default + AsMut<[T]>,
+    T: Clone,
 {
     let mut a = Default::default();
     <A as AsMut<[T]>>::as_mut(&mut a).clone_from_slice(slice);

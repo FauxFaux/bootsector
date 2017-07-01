@@ -7,6 +7,7 @@ mod gpt;
 mod mbr;
 mod rangereader;
 
+#[cfg_attr(rustfmt, rustfmt_skip)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Attributes {
     MBR {
@@ -18,7 +19,7 @@ pub enum Attributes {
         partition_uuid: [u8; 16],
         attributes: [u8; 8],
         name: String,
-    }
+    },
 }
 
 /// An entry in the partition table.
@@ -72,7 +73,9 @@ impl Default for Options {
 }
 
 pub fn open<R>(mut reader: R, options: &Options) -> io::Result<Vec<Partition>>
-where R: io::Read + io::Seek {
+where
+    R: io::Read + io::Seek,
+{
     let header_table = {
         reader.seek(io::SeekFrom::Start(0))?;
 
@@ -87,7 +90,7 @@ where R: io::Read + io::Seek {
     };
 
     match header_table.len() {
-        1 if gpt::protective(&header_table[0]) => {},
+        1 if gpt::protective(&header_table[0]) => {}
         _ => return Ok(header_table),
     }
 
@@ -106,12 +109,15 @@ where R: io::Read + io::Seek {
 
 #[cfg(test)]
 mod tests {
-    use ::open;
+    use open;
     use std::fs;
     use std::io::Read;
     use std::io::Seek;
     #[test]
     fn parse() {
-        open(fs::File::open("src/test-data/4t-gpt.img").unwrap(), &::Options::default()).unwrap();
+        open(
+            fs::File::open("src/test-data/4t-gpt.img").unwrap(),
+            &::Options::default(),
+        ).unwrap();
     }
 }

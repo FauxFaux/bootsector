@@ -13,7 +13,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use rangereader::RangeReader;
 
-use ::Partition;
+use Partition;
 
 const SECTOR_SIZE: usize = 512;
 
@@ -67,7 +67,7 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
             attributes: ::Attributes::MBR {
                 type_code,
                 bootable,
-            }
+            },
         });
     }
 
