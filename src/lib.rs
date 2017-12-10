@@ -162,7 +162,6 @@ where
                 ReadMBR::Never => Err(io::ErrorKind::NotFound.into()),
             }
         }
-
     }
 
     match options.gpt {

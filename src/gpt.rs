@@ -25,15 +25,14 @@ pub fn is_protective(partition: &Partition) -> bool {
         _ => return false,
     };
 
-    0 == partition.id && partition.first_byte <= maximum_sector_size &&
-        partition.len >= minimum_gpt_length
+    0 == partition.id && partition.first_byte <= maximum_sector_size
+        && partition.len >= minimum_gpt_length
 }
 
 pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
 where
     R: io::Read + io::Seek,
 {
-
     reader.seek(io::SeekFrom::Start(sector_size as u64))?;
 
     let mut lba1 = vec![0u8; sector_size];

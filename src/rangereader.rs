@@ -44,11 +44,10 @@ where
 
 impl<R: Seek> Seek for RangeReader<R> {
     fn seek(&mut self, action: SeekFrom) -> Result<u64> {
-
         let new_pos = self.inner.seek(match action {
-            SeekFrom::Start(dist) => SeekFrom::Start(
-                self.first_byte.checked_add(dist).expect("start overflow"),
-            ),
+            SeekFrom::Start(dist) => {
+                SeekFrom::Start(self.first_byte.checked_add(dist).expect("start overflow"))
+            }
             SeekFrom::Current(dist) => SeekFrom::Current(dist),
             SeekFrom::End(dist) => {
                 assert!(dist <= 0, "can't seek positively at end");
