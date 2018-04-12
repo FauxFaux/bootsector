@@ -69,7 +69,6 @@ impl<R: Seek> Seek for RangeReader<R> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::io;

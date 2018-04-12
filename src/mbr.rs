@@ -26,8 +26,7 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
                     ErrorKind::InvalidData,
                     format!(
                         "invalid status code in partition {}: {:x}",
-                        entry_id,
-                        status
+                        entry_id, status
                     ),
                 ))
             }

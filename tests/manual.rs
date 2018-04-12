@@ -2,9 +2,9 @@ extern crate bootsector;
 
 use std::io;
 
-use bootsector::list_partitions;
 use bootsector::Attributes;
 use bootsector::Options;
+use bootsector::list_partitions;
 
 #[test]
 fn four_tee_gpt() {
@@ -26,7 +26,6 @@ fn four_tee_gpt() {
     // TODO: uuids
 }
 
-
 #[test]
 fn fdisk_1m_part() {
     let parts = list_partitions(
@@ -42,7 +41,6 @@ fn fdisk_1m_part() {
 
     // TODO: uuids
 }
-
 
 #[test]
 fn fdisk_empty_gpt() {
@@ -102,7 +100,6 @@ fn ubu_raspi() {
     assert_eq!(138412032, parts[1].first_byte);
     assert_eq!(3860856832, parts[1].len);
 }
-
 
 #[test]
 fn tiny() {
