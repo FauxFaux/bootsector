@@ -1,11 +1,9 @@
 use std;
 use std::io;
-
 use std::io::Error;
 use std::io::ErrorKind::InvalidData;
 
 use byteorder::{ByteOrder, LittleEndian};
-
 use crc::crc32::checksum_ieee;
 
 use Attributes;
@@ -25,7 +23,8 @@ pub fn is_protective(partition: &Partition) -> bool {
         _ => return false,
     };
 
-    0 == partition.id && partition.first_byte <= maximum_sector_size
+    0 == partition.id
+        && partition.first_byte <= maximum_sector_size
         && partition.len >= minimum_gpt_length
 }
 
