@@ -16,3 +16,8 @@ https://docs.rs/bootsector
    could be implemented, but isn't super important, unless you're doing data recovery.
  * Sector sizes apart from 512 bytes are not well tested. These devices don't seem to
    exist as of 2017.
+
+### MSRV
+
+Rust 1.34 (`TryFrom`) is supported, and checked by Travis.
+Updating this is a semver bump.
