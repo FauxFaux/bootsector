@@ -168,8 +168,8 @@ where
         ReadGPT::Never => Ok(header_table),
         ReadGPT::RevisionOne => {
             let sector_size = match options.sector_size {
-                SectorSize::Known(size) => size as usize,
-                SectorSize::GuessOrAssume => header_table[0].first_byte as usize,
+                SectorSize::Known(size) => u64::from(size),
+                SectorSize::GuessOrAssume => header_table[0].first_byte,
             };
 
             gpt::read(reader, sector_size)

@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::io;
 use std::io::Error;
@@ -28,13 +29,20 @@ pub fn is_protective(partition: &Partition) -> bool {
         && partition.len >= minimum_gpt_length
 }
 
-pub fn read<R>(mut reader: R, sector_size: usize) -> io::Result<Vec<Partition>>
+pub fn read<R>(mut reader: R, sector_size: u64) -> io::Result<Vec<Partition>>
 where
     R: io::Read + io::Seek,
 {
-    reader.seek(io::SeekFrom::Start(sector_size as u64))?;
+    reader.seek(io::SeekFrom::Start(sector_size))?;
 
-    let mut lba1 = vec![0u8; sector_size];
+    let sector_size_mem = usize::try_from(sector_size).map_err(|_| {
+        Error::new(
+            io::ErrorKind::InvalidInput,
+            "sector size is bigger than memory",
+        )
+    })?;
+
+    let mut lba1 = vec![0u8; sector_size_mem];
     reader.read_exact(&mut lba1)?;
 
     if b"EFI PART" != &lba1[0x00..0x08] {
@@ -84,7 +92,7 @@ where
         return Err(Error::new(InvalidData, "usable lbas are backwards?!"));
     }
 
-    if last_usable_lba > (std::u64::MAX / sector_size as u64) {
+    if last_usable_lba > (std::u64::MAX / u64::try_from(sector_size).expect("u64 conversion")) {
         return Err(Error::new(
             InvalidData,
             "everything must be below the 2^64 point (~ eighteen million TB)",
@@ -103,20 +111,19 @@ where
 
     let entries = LittleEndian::read_u32(&lba1[0x50..0x54]);
 
-    if entries >= 65536 {
-        return Err(Error::new(InvalidData, "entry count is implausible"));
-    }
+    let entries = u16::try_from(entries)
+        .map_err(|_| Error::new(InvalidData, "entry count is implausible"))?;
 
     let entry_size = LittleEndian::read_u32(&lba1[0x54..0x58]);
-    if entry_size < 128 || entry_size >= 65536 {
-        return Err(Error::new(InvalidData, "entry size is implausible"));
+    let entry_size = u16::try_from(entry_size)
+        .map_err(|_| Error::new(InvalidData, "entry size is implausibly large"))?;
+
+    if entry_size < 128 {
+        return Err(Error::new(InvalidData, "entry size is implausibly small"));
     }
 
-    let entries = entries as usize;
-    let entry_size = entry_size as usize;
-
     // TODO: off-by-1? Not super important.
-    if first_usable_lba < 2 + ((entry_size * entries) / sector_size) as u64 {
+    if first_usable_lba < 2 + ((u64::from(entry_size) * u64::from(entries)) / sector_size) {
         return Err(Error::new(InvalidData, "first usable lba is too low"));
     }
 
@@ -129,7 +136,7 @@ where
         ));
     }
 
-    let mut table = vec![0u8; entry_size * entries];
+    let mut table = vec![0u8; usize::from(entry_size) * usize::from(entries)];
     reader.read_exact(&mut table)?;
 
     if table_crc != checksum_ieee(&table) {
@@ -137,7 +144,8 @@ where
     }
 
     let mut ret = Vec::with_capacity(16);
-    for id in 0..entries {
+    for id in 0..usize::from(entries) {
+        let entry_size = usize::from(entry_size);
         let entry = &table[id * entry_size..(id + 1) * entry_size];
         let type_uuid = &entry[0x00..0x10];
         if all_zero(type_uuid) {
@@ -173,8 +181,8 @@ where
 
         ret.push(Partition {
             id,
-            first_byte: first_lba * sector_size as u64,
-            len: (last_lba - first_lba + 1) * sector_size as u64,
+            first_byte: first_lba * u64::from(sector_size),
+            len: (last_lba - first_lba + 1) * u64::from(sector_size),
             attributes: Attributes::GPT {
                 type_uuid,
                 partition_uuid,
