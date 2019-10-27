@@ -1,3 +1,8 @@
+#![warn(
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap
+)]
 //! Read basic MBR and GPT partition tables from a reader.
 //!
 //! # Examples

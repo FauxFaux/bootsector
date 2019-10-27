@@ -1,27 +1,52 @@
+use std::convert::TryFrom;
+use std::io::Error;
+use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Result;
 use std::io::Seek;
 use std::io::SeekFrom;
 
-/// Produced by `read_partition`.
+/// Produced by `open_partition`.
 pub struct RangeReader<R> {
     inner: R,
     first_byte: u64,
-    len: u64,
+    end: u64,
 }
 
 impl<R: Seek> RangeReader<R> {
     pub fn new(mut inner: R, first_byte: u64, len: u64) -> Result<RangeReader<R>> {
-        assert!(first_byte <= std::i64::MAX as u64);
-        assert!(len <= std::i64::MAX as u64);
+        let end = first_byte
+            .checked_add(len)
+            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "len implausibly past end"))?;
 
-        assert_eq!(first_byte, inner.seek(SeekFrom::Start(first_byte))?);
+        let seeked = inner.seek(SeekFrom::Start(first_byte))?;
+        if seeked != first_byte {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "start after end of file",
+            ));
+        }
 
         Ok(RangeReader {
             inner,
             first_byte,
-            len,
+            end,
         })
+    }
+
+    #[inline]
+    fn check_valid_position(&self, pos: u64) -> Result<()> {
+        if pos < self.first_byte || pos > self.end {
+            Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "illegal cursor position: {} <= {} <= {}",
+                    self.first_byte, pos, self.end,
+                ),
+            ))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -30,39 +55,35 @@ where
     R: Read + Seek,
 {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        let pos = self.inner.seek(SeekFrom::Current(0))? - self.first_byte;
-        let remaining = self.len - pos;
-        if remaining >= buf.len() as u64 {
-            self.inner.read(buf)
-        } else {
-            self.inner.read(&mut buf[0..(remaining as usize)])
-        }
+        let current_real = self.inner.seek(SeekFrom::Current(0))?;
+        self.check_valid_position(current_real)?;
+
+        let available = self.end - current_real;
+        let available = usize::try_from(available).unwrap_or(std::usize::MAX);
+        let available = available.min(buf.len());
+        self.inner.read(&mut buf[..available])
     }
 }
 
 impl<R: Seek> Seek for RangeReader<R> {
     fn seek(&mut self, action: SeekFrom) -> Result<u64> {
-        let new_pos = self.inner.seek(match action {
-            SeekFrom::Start(dist) => {
-                SeekFrom::Start(self.first_byte.checked_add(dist).expect("start overflow"))
-            }
-            SeekFrom::Current(dist) => SeekFrom::Current(dist),
-            SeekFrom::End(dist) => {
-                assert!(dist <= 0, "can't seek positively at end");
-                // TODO: checked?
-                SeekFrom::Start(self.first_byte + self.len - (-dist) as u64)
-            }
-        })?;
+        let new_pos =
+            self.inner.seek(match action {
+                SeekFrom::Start(dist) => {
+                    SeekFrom::Start(self.first_byte.checked_add(dist).expect("start overflow"))
+                }
+                SeekFrom::Current(dist) => SeekFrom::Current(dist),
+                SeekFrom::End(dist) => {
+                    let dist = u64::try_from(-dist).map_err(|_| {
+                        Error::new(ErrorKind::InvalidInput, "can't seek positively at end")
+                    })?;
+                    SeekFrom::Start(self.end.checked_sub(dist).ok_or_else(|| {
+                        Error::new(ErrorKind::InvalidInput, "can't seek before zero")
+                    })?)
+                }
+            })?;
 
-        assert!(
-            new_pos >= self.first_byte && new_pos < self.first_byte + self.len,
-            "out of bound seek: {:?} must leave us between {} and {}, but was {}",
-            action,
-            self.first_byte,
-            self.len,
-            new_pos
-        );
-
+        self.check_valid_position(new_pos)?;
         Ok(new_pos - self.first_byte)
     }
 }
