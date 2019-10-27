@@ -11,7 +11,8 @@ fn four_tee_gpt() {
     let parts = list_partitions(
         cursor(include_bytes!("test-data/4t-gpt.img")),
         &Options::default(),
-    ).expect("success");
+    )
+    .expect("success");
 
     assert_eq!(2, parts.len());
 
@@ -31,7 +32,8 @@ fn fdisk_1m_part() {
     let parts = list_partitions(
         cursor(include_bytes!("test-data/fdisk-1m-part.img")),
         &Options::default(),
-    ).expect("success");
+    )
+    .expect("success");
 
     assert_eq!(1, parts.len());
 
@@ -47,7 +49,8 @@ fn fdisk_empty_gpt() {
     let parts = list_partitions(
         cursor(include_bytes!("test-data/fdisk-empty-gpt.img")),
         &Options::default(),
-    ).expect("success");
+    )
+    .expect("success");
 
     assert_eq!(0, parts.len());
 }
@@ -57,7 +60,8 @@ fn fdisk_empty_mbr() {
     let parts = list_partitions(
         cursor(include_bytes!("test-data/fdisk-empty-mbr.img")),
         &Options::default(),
-    ).expect("success");
+    )
+    .expect("success");
 
     assert_eq!(0, parts.len());
 }
@@ -67,7 +71,8 @@ fn ubu_raspi() {
     let parts = list_partitions(
         cursor(include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img")),
         &Options::default(),
-    ).expect("success");
+    )
+    .expect("success");
 
     assert_eq!(2, parts.len());
 
@@ -106,7 +111,8 @@ fn tiny() {
     let parts = list_partitions(
         cursor(include_bytes!("test-data/tiny.img")),
         &Options::default(),
-    ).expect("success");
+    )
+    .expect("success");
 
     assert_eq!(1, parts.len());
 
@@ -141,8 +147,9 @@ fn require_gpt() {
         list_partitions(
             cursor(include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img")),
             &options,
-        ).unwrap_err()
-            .kind()
+        )
+        .unwrap_err()
+        .kind()
     );
 }
 
