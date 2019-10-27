@@ -41,7 +41,7 @@ mod gpt;
 mod mbr;
 mod rangereader;
 
-use rangereader::RangeReader;
+use crate::rangereader::RangeReader;
 
 /// Table-specific information about a partition.
 #[cfg_attr(rustfmt, rustfmt_skip)]

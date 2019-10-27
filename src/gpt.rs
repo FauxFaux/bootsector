@@ -6,8 +6,8 @@ use std::io::ErrorKind::InvalidData;
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32::checksum_ieee;
 
-use Attributes;
-use Partition;
+use crate::Attributes;
+use crate::Partition;
 
 pub fn is_protective(partition: &Partition) -> bool {
     let protective_type = 0xee;

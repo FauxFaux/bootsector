@@ -4,7 +4,7 @@ use std::io::Result;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use Partition;
+use crate::Partition;
 
 const SECTOR_SIZE: usize = 512;
 
@@ -45,7 +45,7 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
             id: entry_id,
             first_byte,
             len,
-            attributes: ::Attributes::MBR {
+            attributes: crate::Attributes::MBR {
                 type_code,
                 bootable,
             },
