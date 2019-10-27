@@ -1,4 +1,4 @@
-use std;
+use std::convert::TryInto;
 use std::io;
 use std::io::Error;
 use std::io::ErrorKind::InvalidData;
@@ -144,9 +144,9 @@ where
             continue;
         }
 
-        let type_uuid = clone_into_array(type_uuid);
+        let type_uuid = type_uuid.try_into().expect("fixed size slice");
 
-        let partition_uuid = clone_into_array(&entry[0x10..0x20]);
+        let partition_uuid = entry[0x10..0x20].try_into().expect("fixed sized slice");
         let first_lba = LittleEndian::read_u64(&entry[0x20..0x28]);
         let last_lba = LittleEndian::read_u64(&entry[0x28..0x30]);
 
@@ -154,7 +154,7 @@ where
             return Err(Error::new(InvalidData, "partition entry is out of range"));
         }
 
-        let attributes = clone_into_array(&entry[0x30..0x38]);
+        let attributes = entry[0x30..0x38].try_into().expect("fixed size slice");
         let name_data = &entry[0x38..0x80];
         let name_le: Vec<u16> = (0..32)
             .map(|idx| LittleEndian::read_u16(&name_data[idx..]))
@@ -189,17 +189,4 @@ where
 
 fn all_zero(val: &[u8]) -> bool {
     val.iter().all(|x| 0 == *x)
-}
-
-use std::convert::AsMut;
-
-/// https://stackoverflow.com/questions/37678698/function-to-build-a-fixed-sized-array-from-slice/37679019#37679019
-fn clone_into_array<A, T>(slice: &[T]) -> A
-where
-    A: Sized + Default + AsMut<[T]>,
-    T: Clone,
-{
-    let mut a = Default::default();
-    <A as AsMut<[T]>>::as_mut(&mut a).clone_from_slice(slice);
-    a
 }
