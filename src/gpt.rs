@@ -58,6 +58,9 @@ where
         return Err(Error::new(InvalidData, "header too short"));
     }
 
+    let header_size = usize::try_from(header_size)
+        .map_err(|_| Error::new(InvalidData, "header size must fit in memory"))?;
+
     let header_crc = le::read_u32(&lba1[0x10..0x14]);
 
     // CRC is calculated with the CRC zero'd out
@@ -65,7 +68,7 @@ where
         lba1[crc_part] = 0;
     }
 
-    if header_crc != checksum_ieee(&lba1[..header_size as usize]) {
+    if header_crc != checksum_ieee(&lba1[..header_size]) {
         return Err(Error::new(InvalidData, "header checksum mismatch"));
     }
 
@@ -129,7 +132,7 @@ where
 
     let table_crc = le::read_u32(&lba1[0x58..0x5c]);
 
-    if !all_zero(&lba1[header_size as usize..]) {
+    if !all_zero(&lba1[header_size..]) {
         return Err(Error::new(
             InvalidData,
             "reserved header tail is not all empty",
