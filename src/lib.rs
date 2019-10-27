@@ -44,7 +44,6 @@ mod rangereader;
 use crate::rangereader::RangeReader;
 
 /// Table-specific information about a partition.
-#[cfg_attr(rustfmt, rustfmt_skip)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Attributes {
     MBR {

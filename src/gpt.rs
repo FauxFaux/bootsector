@@ -49,7 +49,7 @@ where
         return Err(Error::new(InvalidData, "bad EFI signature"));
     }
 
-    if &[0, 0, 1, 0] != &lba1[0x08..0x0c] {
+    if [0, 0, 1, 0] != lba1[0x08..0x0c] {
         return Err(Error::new(InvalidData, "unsupported revision"));
     }
 
@@ -181,8 +181,8 @@ where
 
         ret.push(Partition {
             id,
-            first_byte: first_lba * u64::from(sector_size),
-            len: (last_lba - first_lba + 1) * u64::from(sector_size),
+            first_byte: first_lba * sector_size,
+            len: (last_lba - first_lba + 1) * sector_size,
             attributes: Attributes::GPT {
                 type_uuid,
                 partition_uuid,
