@@ -1,5 +1,3 @@
-use std;
-
 use std::io::Read;
 use std::io::Result;
 use std::io::Seek;

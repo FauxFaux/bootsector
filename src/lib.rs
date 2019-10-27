@@ -32,12 +32,10 @@
 //! # }
 //! ```
 
-extern crate byteorder;
-extern crate crc;
-
 use std::io;
 
 mod gpt;
+mod le;
 mod mbr;
 mod rangereader;
 

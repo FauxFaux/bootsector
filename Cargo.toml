@@ -18,5 +18,4 @@ edition = "2018"
 repository = "FauxFaux/bootsector"
 
 [dependencies]
-byteorder = "1"
 crc = "1"

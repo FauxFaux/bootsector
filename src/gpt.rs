@@ -4,9 +4,9 @@ use std::io;
 use std::io::Error;
 use std::io::ErrorKind::InvalidData;
 
-use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32::checksum_ieee;
 
+use crate::le;
 use crate::Attributes;
 use crate::Partition;
 
@@ -53,12 +53,12 @@ where
         return Err(Error::new(InvalidData, "unsupported revision"));
     }
 
-    let header_size = LittleEndian::read_u32(&lba1[0x0c..0x10]);
+    let header_size = le::read_u32(&lba1[0x0c..0x10]);
     if header_size < 92 {
         return Err(Error::new(InvalidData, "header too short"));
     }
 
-    let header_crc = LittleEndian::read_u32(&lba1[0x10..0x14]);
+    let header_crc = le::read_u32(&lba1[0x10..0x14]);
 
     // CRC is calculated with the CRC zero'd out
     for crc_part in 0x10..0x14 {
@@ -69,14 +69,14 @@ where
         return Err(Error::new(InvalidData, "header checksum mismatch"));
     }
 
-    if 0 != LittleEndian::read_u32(&lba1[0x14..0x18]) {
+    if 0 != le::read_u32(&lba1[0x14..0x18]) {
         return Err(Error::new(
             InvalidData,
             "unsupported data in reserved field 0x0c",
         ));
     }
 
-    if 1 != LittleEndian::read_u64(&lba1[0x18..0x20]) {
+    if 1 != le::read_u64(&lba1[0x18..0x20]) {
         return Err(Error::new(
             InvalidData,
             "current lba must be '1' for first header",
@@ -85,8 +85,8 @@ where
 
     // backup lba [ignored]
 
-    let first_usable_lba = LittleEndian::read_u64(&lba1[0x28..0x30]);
-    let last_usable_lba = LittleEndian::read_u64(&lba1[0x30..0x38]);
+    let first_usable_lba = le::read_u64(&lba1[0x28..0x30]);
+    let last_usable_lba = le::read_u64(&lba1[0x30..0x38]);
 
     if first_usable_lba > last_usable_lba {
         return Err(Error::new(InvalidData, "usable lbas are backwards?!"));
@@ -102,19 +102,19 @@ where
     let mut guid = [0u8; 16];
     guid.copy_from_slice(&lba1[0x38..0x48]);
 
-    if 2 != LittleEndian::read_u64(&lba1[0x48..0x50]) {
+    if 2 != le::read_u64(&lba1[0x48..0x50]) {
         return Err(Error::new(
             InvalidData,
             "starting lba must be '2' for first header",
         ));
     }
 
-    let entries = LittleEndian::read_u32(&lba1[0x50..0x54]);
+    let entries = le::read_u32(&lba1[0x50..0x54]);
 
     let entries = u16::try_from(entries)
         .map_err(|_| Error::new(InvalidData, "entry count is implausible"))?;
 
-    let entry_size = LittleEndian::read_u32(&lba1[0x54..0x58]);
+    let entry_size = le::read_u32(&lba1[0x54..0x58]);
     let entry_size = u16::try_from(entry_size)
         .map_err(|_| Error::new(InvalidData, "entry size is implausibly large"))?;
 
@@ -127,7 +127,7 @@ where
         return Err(Error::new(InvalidData, "first usable lba is too low"));
     }
 
-    let table_crc = LittleEndian::read_u32(&lba1[0x58..0x5c]);
+    let table_crc = le::read_u32(&lba1[0x58..0x5c]);
 
     if !all_zero(&lba1[header_size as usize..]) {
         return Err(Error::new(
@@ -155,8 +155,8 @@ where
         let type_uuid = type_uuid.try_into().expect("fixed size slice");
 
         let partition_uuid = entry[0x10..0x20].try_into().expect("fixed sized slice");
-        let first_lba = LittleEndian::read_u64(&entry[0x20..0x28]);
-        let last_lba = LittleEndian::read_u64(&entry[0x28..0x30]);
+        let first_lba = le::read_u64(&entry[0x20..0x28]);
+        let last_lba = le::read_u64(&entry[0x28..0x30]);
 
         if first_lba > last_lba || first_lba < first_usable_lba || last_lba > last_usable_lba {
             return Err(Error::new(InvalidData, "partition entry is out of range"));
@@ -165,7 +165,7 @@ where
         let attributes = entry[0x30..0x38].try_into().expect("fixed size slice");
         let name_data = &entry[0x38..0x80];
         let name_le: Vec<u16> = (0..32)
-            .map(|idx| LittleEndian::read_u16(&name_data[idx..]))
+            .map(|idx| le::read_u16(&name_data[idx..]))
             .take_while(|val| 0 != *val)
             .collect();
 
