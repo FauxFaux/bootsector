@@ -167,8 +167,8 @@ where
 
         let attributes = entry[0x30..0x38].try_into().expect("fixed size slice");
         let name_data = &entry[0x38..0x80];
-        let name_le: Vec<u16> = (0..32)
-            .map(|idx| le::read_u16(&name_data[idx..]))
+        let name_le: Vec<u16> = (0..(0x80 - 0x38) / 2)
+            .map(|idx| le::read_u16(&name_data[2 * idx..2 * (idx + 1)]))
             .take_while(|val| 0 != *val)
             .collect();
 

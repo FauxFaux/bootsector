@@ -2,9 +2,9 @@ extern crate bootsector;
 
 use std::io;
 
-use bootsector::list_partitions;
 use bootsector::Attributes;
 use bootsector::Options;
+use bootsector::{list_partitions, Partition};
 
 #[test]
 fn four_tee_gpt() {
@@ -19,10 +19,12 @@ fn four_tee_gpt() {
     assert_eq!(0, parts[0].id);
     assert_eq!(1024 * 1024, parts[0].first_byte);
     assert_eq!(3_000_999_346_176, parts[0].len);
+    assert_eq!("", gpt_name(&parts[0]));
 
     assert_eq!(1, parts[1].id);
     assert_eq!(3_001_000_394_752, parts[1].first_byte);
     assert_eq!(999_786_618_368, parts[1].len);
+    assert_eq!("", gpt_name(&parts[1]));
 
     // TODO: uuids
 }
@@ -153,6 +155,37 @@ fn require_gpt() {
     );
 }
 
+#[test]
+fn labels() {
+    let mut options = Options::default();
+    options.mbr = bootsector::ReadMBR::Never;
+    let partitions =
+        list_partitions(cursor(include_bytes!("test-data/labels.img")), &options).expect("success");
+
+    assert_eq!(
+        vec![
+            "first".to_string(),
+            "with spaces".to_string(),
+            "!\"$%^&*()_+*&$%/,".to_string(),
+            "£10, €20".to_string(),
+            "héllɵ".to_string(),
+            "東京都".to_string(),
+            "123456789012345678901234567890123456".to_string(),
+        ],
+        partitions
+            .into_iter()
+            .map(|p| gpt_name(&p).to_string())
+            .collect::<Vec<_>>()
+    );
+}
+
 fn cursor(bytes: &[u8]) -> io::Cursor<&[u8]> {
     io::Cursor::new(bytes)
+}
+
+fn gpt_name(part: &Partition) -> &str {
+    match &part.attributes {
+        Attributes::GPT { name, .. } => name,
+        _ => panic!("not a GPT partition"),
+    }
 }
