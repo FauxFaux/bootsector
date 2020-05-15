@@ -11,6 +11,7 @@ use crate::Attributes;
 use crate::Partition;
 
 pub fn is_protective(partition: &Partition) -> bool {
+    const MAXIMUM_SECTOR_SIZE: u64 = 16 * 1024;
     const PROTECTIVE_TYPE: u8 = 0xee;
 
     match partition.attributes {
@@ -22,7 +23,7 @@ pub fn is_protective(partition: &Partition) -> bool {
     };
 
     0 == partition.id
-        && partition.first_byte <= maximum_sector_size
+        && partition.first_byte <= MAXIMUM_SECTOR_SIZE
 }
 
 pub fn read<R>(mut reader: R, sector_size: u64) -> io::Result<Vec<Partition>>
