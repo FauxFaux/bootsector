@@ -11,22 +11,19 @@ use crate::Attributes;
 use crate::Partition;
 
 pub fn is_protective(partition: &Partition) -> bool {
-    let protective_type = 0xee;
-    let maximum_sector_size = 16 * 1024;
-    let sector_size_guess = partition.first_byte;
-    let minimum_gpt_length = 128 * 128 + sector_size_guess;
+    const MAXIMUM_SECTOR_SIZE: u64 = 16 * 1024;
+    const PROTECTIVE_TYPE: u8 = 0xee;
 
     match partition.attributes {
         Attributes::MBR {
             type_code,
             bootable: false,
-        } if type_code == protective_type => {}
+        } if type_code == PROTECTIVE_TYPE => {}
         _ => return false,
     };
 
     0 == partition.id
-        && partition.first_byte <= maximum_sector_size
-        && partition.len >= minimum_gpt_length
+        && partition.first_byte <= MAXIMUM_SECTOR_SIZE
 }
 
 pub fn read<R>(mut reader: R, sector_size: u64) -> io::Result<Vec<Partition>>
