@@ -190,7 +190,7 @@ fn find_short_gpt() {
             _ => &v,
         });
     }
-    assert_eq!(0, partitions.len());
+    assert_eq!(70, partitions.len());
 }
 
 fn cursor(bytes: &[u8]) -> io::Cursor<&[u8]> {
