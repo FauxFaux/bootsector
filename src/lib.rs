@@ -44,7 +44,7 @@ mod le;
 mod mbr;
 mod rangereader;
 
-use crate::rangereader::RangeReader;
+pub use rangereader::RangeReader;
 
 /// Table-specific information about a partition.
 #[derive(Debug, Clone, Eq, PartialEq)]
