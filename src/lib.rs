@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![warn(
     clippy::cast_lossless,
     clippy::cast_possible_truncation,
@@ -37,14 +38,22 @@
 //! # }
 //! ```
 
-use std::io;
-
 mod gpt;
 mod le;
 mod mbr;
+#[doc(hidden)]
+pub(crate) mod no_std;
 mod rangereader;
+pub mod read;
 
-pub use rangereader::RangeReader;
+use smallvec::SmallVec;
+
+use read::{Read, Seek, SeekFrom};
+
+pub use rangereader::{RangeError, RangeReader};
+
+/// Maximum number of partition amongst mbr (4) and gpt (16)
+const MAX_PARTITIONS: usize = 16;
 
 /// Table-specific information about a partition.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -57,7 +66,7 @@ pub enum Attributes {
         type_uuid: [u8; 16],
         partition_uuid: [u8; 16],
         attributes: [u8; 8],
-        name: String,
+        name: SmallVec<[u16; 36]>,
     },
 }
 
@@ -139,18 +148,53 @@ impl Default for Options {
 /// * `ErrorKind::InvalidData` if anything is not as we expect,
 ///       including it looking like there should be GPT but its magic is missing.
 /// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
-pub fn list_partitions<R>(mut reader: R, options: &Options) -> io::Result<Vec<Partition>>
+#[cfg(feature = "std")]
+pub fn list_partitions<R>(
+    reader: &mut R,
+    options: &Options,
+) -> Result<Vec<Partition>, Error<R::Error>>
 where
-    R: io::Read + io::Seek,
+    R: Read + Seek,
+{
+    list_partitions_(reader, options).map(|o| o.into_vec())
+}
+
+/// Read the list of partitions.
+///
+/// # Returns
+///
+/// * A possibly empty list of partitions.
+/// * `ErrorKind::NotFound` if the boot magic is not found,
+///        or you asked for partition types that are not there
+/// * `ErrorKind::InvalidData` if anything is not as we expect,
+///       including it looking like there should be GPT but its magic is missing.
+/// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
+#[cfg(not(feature = "std"))]
+pub fn list_partitions<R>(
+    reader: &mut R,
+    options: &Options,
+) -> Result<SmallVec<[Partition; MAX_PARTITIONS]>, Error<R::Error>>
+where
+    R: Read + Seek,
+{
+    list_partitions_(reader, options)
+}
+
+fn list_partitions_<R>(
+    reader: &mut R,
+    options: &Options,
+) -> Result<SmallVec<[Partition; MAX_PARTITIONS]>, Error<R::Error>>
+where
+    R: Read + Seek,
 {
     let header_table = {
-        reader.seek(io::SeekFrom::Start(0))?;
+        reader.seek(SeekFrom::Start(0)).map(Error::Io)?;
 
         let mut disc_header = [0u8; 512];
-        reader.read_exact(&mut disc_header)?;
+        reader.read_exact(&mut disc_header).map(Error::Io)?;
 
         if 0x55 != disc_header[510] || 0xAA != disc_header[511] {
-            return Err(io::ErrorKind::NotFound.into());
+            return Err(Error::HeaderNotFound);
         }
 
         mbr::parse_partition_table(&disc_header)?
@@ -161,7 +205,7 @@ where
         _ => {
             return match options.mbr {
                 ReadMBR::Modern => Ok(header_table),
-                ReadMBR::Never => Err(io::ErrorKind::NotFound.into()),
+                ReadMBR::Never => Err(Error::HeaderNotFound),
             }
         }
     }
@@ -174,15 +218,43 @@ where
                 SectorSize::GuessOrAssume => header_table[0].first_byte,
             };
 
-            gpt::read(reader, sector_size)
+            gpt::read(reader, sector_size).map_err(|e| e.into())
         }
     }
 }
 
 /// Open the contents of a partition for reading.
-pub fn open_partition<R>(inner: R, part: &Partition) -> io::Result<RangeReader<R>>
+pub fn open_partition<R>(
+    inner: R,
+    part: &Partition,
+) -> Result<RangeReader<R>, Error<RangeError<Error<R::Error>>>>
 where
-    R: io::Read + io::Seek,
+    R: Read + Seek,
 {
-    RangeReader::new(inner, part.first_byte, part.len)
+    RangeReader::new(inner, part.first_byte, part.len).map_err(Error::Io)
+}
+
+#[cfg_attr(feature = "std", derive(Error))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum Error<E> {
+    #[cfg_attr(feature = "std", error("IO error: {}"))]
+    Io(E),
+    #[cfg_attr(feature = "std", error("GPT error: {}"))]
+    Gpt(gpt::GptError),
+    #[cfg_attr(feature = "std", error("MBR error: {}"))]
+    Mbr(mbr::MbrError),
+    #[cfg_attr(feature = "std", error("partition header not found"))]
+    HeaderNotFound,
+}
+
+impl<E> From<gpt::GptError> for Error<E> {
+    fn from(e: gpt::GptError) -> Self {
+        Error::Gpt(e)
+    }
+}
+
+impl<E> From<mbr::MbrError> for Error<E> {
+    fn from(e: mbr::MbrError) -> Self {
+        Error::Mbr(e)
+    }
 }

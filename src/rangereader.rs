@@ -1,10 +1,43 @@
-use std::convert::TryFrom;
-use std::io::Error;
-use std::io::ErrorKind;
-use std::io::Read;
-use std::io::Result;
-use std::io::Seek;
-use std::io::SeekFrom;
+use crate::no_std::convert::TryFrom;
+#[cfg(feature = "std")]
+use std::io::{self, ErrorKind, SeekFrom};
+
+use crate::read::{Read, ReaderError, Seek, SeekFrom};
+use crate::Error;
+
+#[cfg_attr(feature = "std", derive(Error))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum RangeError<E> {
+    #[cfg_attr(feature = "std", error("len implausibly past end"))]
+    LenImplausiblePastEnd,
+    #[cfg_attr(feature = "std", error("start after end of file"))]
+    StartAfterEndOfFile,
+    #[cfg_attr(
+        feature = "std",
+        error("illegal cursor position: {first_byte} <= {pos} <= {end}")
+    )]
+    IllegalCursorPosition { first_byte: u64, pos: u64, end: u64 },
+    #[cfg_attr(feature = "std", error("can't seek positively at end"))]
+    CantSeekPastEnd,
+    #[cfg_attr(feature = "std", error("can't seek before zero"))]
+    CantSeekBeforeStart,
+    #[cfg_attr(feature = "std", error("Inner io error: {}"))]
+    Inner(E),
+}
+
+#[cfg(feature = "std")]
+impl<E> Into<io::Error> for RangeError<E>
+where
+    E: Into<io::Error>,
+{
+    fn into(self) -> io::Error {
+        use RangeError::*;
+        match self {
+            Inner(E) => E,
+            e => io::Error::new(ErrorKind::InvalidInput, format!("{}", e)),
+        }
+    }
+}
 
 /// Produced by `open_partition`.
 pub struct RangeReader<R> {
@@ -14,17 +47,20 @@ pub struct RangeReader<R> {
 }
 
 impl<R: Seek> RangeReader<R> {
-    pub fn new(mut inner: R, first_byte: u64, len: u64) -> Result<RangeReader<R>> {
+    pub fn new(
+        mut inner: R,
+        first_byte: u64,
+        len: u64,
+    ) -> Result<RangeReader<R>, RangeError<Error<R::Error>>> {
         let end = first_byte
             .checked_add(len)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "len implausibly past end"))?;
+            .ok_or_else(|| RangeError::LenImplausiblePastEnd)?;
 
-        let seeked = inner.seek(SeekFrom::Start(first_byte))?;
+        let seeked = inner
+            .seek(SeekFrom::Start(first_byte))
+            .map_err(RangeError::Inner)?;
         if seeked != first_byte {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "start after end of file",
-            ));
+            return Err(RangeError::StartAfterEndOfFile);
         }
 
         Ok(RangeReader {
@@ -35,55 +71,94 @@ impl<R: Seek> RangeReader<R> {
     }
 
     #[inline]
-    fn check_valid_position(&self, pos: u64) -> Result<()> {
+    fn check_valid_position(&self, pos: u64) -> Result<(), RangeError<Error<R::Error>>> {
         if pos < self.first_byte || pos > self.end {
-            Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!(
-                    "illegal cursor position: {} <= {} <= {}",
-                    self.first_byte, pos, self.end,
-                ),
-            ))
+            Err(RangeError::IllegalCursorPosition {
+                first_byte: self.first_byte,
+                pos,
+                end: self.end,
+            })
         } else {
             Ok(())
         }
     }
 }
 
-impl<R> Read for RangeReader<R>
+impl<R, E> ReaderError for RangeReader<R>
 where
-    R: Read + Seek,
+    R: Read<Error = E> + Seek<Error = E>,
 {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        let current_real = self.inner.seek(SeekFrom::Current(0))?;
-        self.check_valid_position(current_real)?;
+    // We carry over the error from the inner reader
+    type Error = RangeError<Error<E>>;
+}
+
+impl<R, E> Read for RangeReader<R>
+where
+    R: Read<Error = E> + Seek<Error = E>,
+{
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, Error<Self::Error>> {
+        let current_real = self
+            .inner
+            .seek(SeekFrom::Current(0))
+            .map_err(RangeError::Inner)
+            .map_err(Error::Io)?;
+        self.check_valid_position(current_real).map_err(Error::Io)?;
 
         let available = self.end - current_real;
-        let available = usize::try_from(available).unwrap_or(std::usize::MAX);
+        let available = usize::try_from(available).unwrap_or(crate::no_std::usize::MAX);
         let available = available.min(buf.len());
-        self.inner.read(&mut buf[..available])
+        self.inner
+            .read(&mut buf[..available])
+            .map_err(RangeError::Inner)
+            .map_err(Error::Io)
+    }
+
+    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<(), Error<Self::Error>> {
+        let current_real = self
+            .inner
+            .seek(SeekFrom::Current(0))
+            .map_err(RangeError::Inner)
+            .map_err(Error::Io)?;
+        self.check_valid_position(current_real).map_err(Error::Io)?;
+
+        let end_real = current_real + buf.len() as u64;
+        self.check_valid_position(end_real).map_err(Error::Io)?;
+
+        self.inner
+            .read_exact(buf)
+            .map_err(RangeError::Inner)
+            .map_err(Error::Io)
     }
 }
 
-impl<R: Seek> Seek for RangeReader<R> {
-    fn seek(&mut self, action: SeekFrom) -> Result<u64> {
-        let new_pos =
-            self.inner.seek(match action {
+impl<R> Seek for RangeReader<R>
+where
+    R: Read + Seek,
+{
+    fn seek(&mut self, action: SeekFrom) -> Result<u64, Error<Self::Error>> {
+        let new_pos = self
+            .inner
+            .seek(match action {
                 SeekFrom::Start(dist) => {
                     SeekFrom::Start(self.first_byte.checked_add(dist).expect("start overflow"))
                 }
                 SeekFrom::Current(dist) => SeekFrom::Current(dist),
                 SeekFrom::End(dist) => {
-                    let dist = u64::try_from(-dist).map_err(|_| {
-                        Error::new(ErrorKind::InvalidInput, "can't seek positively at end")
-                    })?;
-                    SeekFrom::Start(self.end.checked_sub(dist).ok_or_else(|| {
-                        Error::new(ErrorKind::InvalidInput, "can't seek before zero")
-                    })?)
+                    let dist = u64::try_from(-dist)
+                        .map_err(|_| RangeError::CantSeekPastEnd)
+                        .map_err(Error::Io)?;
+                    SeekFrom::Start(
+                        self.end
+                            .checked_sub(dist)
+                            .ok_or_else(|| RangeError::CantSeekBeforeStart)
+                            .map_err(Error::Io)?,
+                    )
                 }
-            })?;
+            })
+            .map_err(RangeError::Inner)
+            .map_err(Error::Io)?;
 
-        self.check_valid_position(new_pos)?;
+        self.check_valid_position(new_pos).map_err(Error::Io)?;
         Ok(new_pos - self.first_byte)
     }
 }

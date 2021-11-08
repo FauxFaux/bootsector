@@ -1,16 +1,35 @@
-use std::convert::TryFrom;
-use std::io::Error;
-use std::io::ErrorKind;
-use std::io::Result;
+use crate::no_std::convert::TryFrom;
+#[cfg(feature = "std")]
+use std::io::{self, Error, ErrorKind::InvalidData};
+
+use smallvec::SmallVec;
 
 use crate::le;
 use crate::Partition;
+use crate::MAX_PARTITIONS;
 
 const SECTOR_SIZE: usize = 512;
 
 /// Read a DOS/MBR partition table from a 512-byte boot sector, providing a disc sector size.
-pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition>> {
-    let mut partitions = Vec::with_capacity(4);
+#[cfg(feature = "std")]
+pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> io::Result<Vec<Partition>> {
+    parse_partition_table_(sector)
+        .map(|o| o.into_vec())
+        .map_err(|e| e.into())
+}
+
+/// Read a DOS/MBR partition table from a 512-byte boot sector, providing a disc sector size.
+#[cfg(not(feature = "std"))]
+pub fn parse_partition_table(
+    sector: &[u8; SECTOR_SIZE],
+) -> Result<SmallVec<[Partition; MAX_PARTITIONS]>, MbrError> {
+    parse_partition_table_(sector)
+}
+
+fn parse_partition_table_(
+    sector: &[u8; SECTOR_SIZE],
+) -> Result<SmallVec<[Partition; MAX_PARTITIONS]>, MbrError> {
+    let mut partitions = SmallVec::<[_; MAX_PARTITIONS]>::with_capacity(4);
 
     for entry_id in 0..4 {
         let first_entry_offset = 446;
@@ -22,13 +41,7 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
             0x00 => false,
             0x80 => true,
             _ => {
-                return Err(Error::new(
-                    ErrorKind::InvalidData,
-                    format!(
-                        "invalid status code in partition {}: {:x}",
-                        entry_id, status
-                    ),
-                ))
+                return Err(MbrError::InvalidStatusCode { entry_id, status });
             }
         };
 
@@ -54,4 +67,21 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
     }
 
     Ok(partitions)
+}
+
+#[cfg_attr(feature = "std", derive(Error))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum MbrError {
+    #[cfg_attr(
+        feature = "std",
+        error("invalid status code in partition {entry_id}: {status:x}")
+    )]
+    InvalidStatusCode { entry_id: usize, status: u8 },
+}
+
+#[cfg(feature = "std")]
+impl Into<io::Error> for MbrError {
+    fn into(e: Self) -> io::Error {
+        Error::new(InvalidData, format!("{}", e))
+    }
 }

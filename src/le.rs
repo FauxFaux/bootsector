@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use crate::no_std::convert::TryInto;
 
 #[inline]
 pub fn read_u16(slice: &[u8]) -> u16 {
