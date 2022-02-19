@@ -181,14 +181,20 @@ fn labels() {
 
 #[test]
 fn find_short_gpt() {
-    let partitions =
-        list_partitions(cursor(include_bytes!("test-data/pirroman-short-header.img")), &Options::default()).expect("success");
+    let partitions = list_partitions(
+        cursor(include_bytes!("test-data/pirroman-short-header.img")),
+        &Options::default(),
+    )
+    .expect("success");
     let v = "??".to_string();
     for x in &partitions {
-        println!("{}", match &x.attributes {
-            Attributes::GPT { name, .. } => name,
-            _ => &v,
-        });
+        println!(
+            "{}",
+            match &x.attributes {
+                Attributes::GPT { name, .. } => name,
+                _ => &v,
+            }
+        );
     }
     assert_eq!(70, partitions.len());
 }

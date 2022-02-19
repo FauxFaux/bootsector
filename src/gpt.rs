@@ -37,8 +37,7 @@ pub fn is_protective(partition: &Partition) -> bool {
         _ => return false,
     };
 
-    0 == partition.id
-        && partition.first_byte <= MAXIMUM_SECTOR_SIZE
+    0 == partition.id && partition.first_byte <= MAXIMUM_SECTOR_SIZE
 }
 
 pub fn read<R>(mut reader: R, sector_size: u64) -> io::Result<Vec<Partition>>
