@@ -18,4 +18,4 @@ edition = "2018"
 repository = "FauxFaux/bootsector"
 
 [dependencies]
-crc = "1"
+crc = "2"

@@ -4,11 +4,26 @@ use std::io;
 use std::io::Error;
 use std::io::ErrorKind::InvalidData;
 
-use crc::crc32::checksum_ieee;
+use crc::Crc;
 
 use crate::le;
 use crate::Attributes;
 use crate::Partition;
+
+// Apparently we have to pick a name from a random page on sourceforge.
+// Random sourceforge page: https://reveng.sourceforge.io/crc-catalogue/all.htm
+
+// There's no clarification on *which* "crc32" to use in the GPT spec.
+// OSDev: > For the checksums in the header, the CCITT32 ANSI CRC method is used, the one with the polynomial 0x04c11db7
+//          (same as in gzip, and different to the Castagnoli CRC32 [...]
+// "CCITT" is apparently the French name for ITU-T.
+
+// Random sourceforge page:
+// > Alias: CRC-32, CRC-32/ADCCP, CRC-32/V-42, CRC-32/XZ, PKZIP. HDLC is defined in ISO/IEC 13239.
+// > ITU-T Recommendation V.42 (March 2002). "HDLC" is some networking thing; why not, eh.
+
+// (and the values check out)
+const CRC: Crc<u32> = Crc::<u32>::new(&crc::CRC_32_ISO_HDLC);
 
 pub fn is_protective(partition: &Partition) -> bool {
     const MAXIMUM_SECTOR_SIZE: u64 = 16 * 1024;
@@ -65,7 +80,7 @@ where
         lba1[crc_part] = 0;
     }
 
-    if header_crc != checksum_ieee(&lba1[..header_size]) {
+    if header_crc != CRC.checksum(&lba1[..header_size]) {
         return Err(Error::new(InvalidData, "header checksum mismatch"));
     }
 
@@ -92,7 +107,7 @@ where
         return Err(Error::new(InvalidData, "usable lbas are backwards?!"));
     }
 
-    if last_usable_lba > (std::u64::MAX / u64::try_from(sector_size).expect("u64 conversion")) {
+    if last_usable_lba > (u64::MAX / u64::try_from(sector_size).expect("u64 conversion")) {
         return Err(Error::new(
             InvalidData,
             "everything must be below the 2^64 point (~ eighteen million TB)",
@@ -139,7 +154,7 @@ where
     let mut table = vec![0u8; usize::from(entry_size) * usize::from(entries)];
     reader.read_exact(&mut table)?;
 
-    if table_crc != checksum_ieee(&table) {
+    if table_crc != CRC.checksum(&table) {
         return Err(Error::new(InvalidData, "table crc invalid"));
     }
 
