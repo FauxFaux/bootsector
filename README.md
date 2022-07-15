@@ -19,5 +19,4 @@ https://docs.rs/bootsector
 
 ### MSRV
 
-Rust 1.34 (`TryFrom`) is supported, and checked by CI.
-Updating this is a semver bump.
+Rust 1.46 is supported, and checked by CI. Updating this is a semver bump.
