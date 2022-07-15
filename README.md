@@ -1,7 +1,7 @@
 This crate can parse GPT and basic MBR partition tables.
 
-[![Build status](https://api.travis-ci.org/FauxFaux/bootsector.png)](https://travis-ci.org/FauxFaux/bootsector)
-[![](http://meritbadge.herokuapp.com/bootsector)](https://crates.io/crates/bootsector)
+[![Github CI](https://github.com/FauxFaux/bootsector/actions/workflows/rust.yml/badge.svg)](https://github.com/FauxFaux/bootsector/actions/workflows/rust.yml)
+[![crates.io](https://img.shields.io/crates/v/bootsector.svg)](https://crates.io/crates/bootsector)
 
 
 ### Documentation and Examples
@@ -19,5 +19,5 @@ https://docs.rs/bootsector
 
 ### MSRV
 
-Rust 1.34 (`TryFrom`) is supported, and checked by Travis.
+Rust 1.34 (`TryFrom`) is supported, and checked by CI.
 Updating this is a semver bump.

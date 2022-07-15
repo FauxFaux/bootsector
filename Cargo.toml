@@ -14,8 +14,5 @@ version = "0.1.6"
 
 edition = "2018"
 
-[badges.travis-ci]
-repository = "FauxFaux/bootsector"
-
 [dependencies]
 crc = "2"
