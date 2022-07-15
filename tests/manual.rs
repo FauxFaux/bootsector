@@ -199,8 +199,8 @@ fn find_short_gpt() {
     assert_eq!(70, partitions.len());
 }
 
-fn cursor(bytes: &[u8]) -> io::Cursor<&[u8]> {
-    io::Cursor::new(bytes)
+fn cursor(bytes: &[u8]) -> &[u8] {
+    bytes
 }
 
 fn gpt_name(part: &Partition) -> &str {

@@ -14,7 +14,7 @@
 //! use bootsector::{list_partitions, open_partition, Options, Attributes};
 //!
 //! # fn go<R>(mut reader: R) -> io::Result<()>
-//! # where R: io::Read + io::Seek {
+//! # where R: positioned_io2::ReadAt {
 //! // let reader = ...;
 //! let partitions = list_partitions(&mut reader, &Options::default())?;
 //! let part = &partitions[0];
@@ -42,9 +42,8 @@ use std::io;
 mod gpt;
 mod le;
 mod mbr;
-mod rangereader;
 
-pub use rangereader::RangeReader;
+pub use positioned_io2 as pio;
 
 /// Table-specific information about a partition.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -139,15 +138,13 @@ impl Default for Options {
 /// * `ErrorKind::InvalidData` if anything is not as we expect,
 ///       including it looking like there should be GPT but its magic is missing.
 /// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
-pub fn list_partitions<R>(mut reader: R, options: &Options) -> io::Result<Vec<Partition>>
+pub fn list_partitions<R>(reader: R, options: &Options) -> io::Result<Vec<Partition>>
 where
-    R: io::Read + io::Seek,
+    R: pio::ReadAt,
 {
     let header_table = {
-        reader.seek(io::SeekFrom::Start(0))?;
-
         let mut disc_header = [0u8; 512];
-        reader.read_exact(&mut disc_header)?;
+        reader.read_exact_at(0, &mut disc_header)?;
 
         if 0x55 != disc_header[510] || 0xAA != disc_header[511] {
             return Err(io::ErrorKind::NotFound.into());
@@ -174,15 +171,15 @@ where
                 SectorSize::GuessOrAssume => header_table[0].first_byte,
             };
 
-            gpt::read(reader, sector_size)
+            gpt::read(pio::Cursor::new(reader), sector_size)
         }
     }
 }
 
 /// Open the contents of a partition for reading.
-pub fn open_partition<R>(inner: R, part: &Partition) -> io::Result<RangeReader<R>>
+pub fn open_partition<R>(inner: R, part: &Partition) -> io::Result<pio::Slice<R>>
 where
-    R: io::Read + io::Seek,
+    R: pio::ReadAt,
 {
-    RangeReader::new(inner, part.first_byte, part.len)
+    Ok(pio::Slice::new(inner, part.first_byte, Some(part.len)))
 }
