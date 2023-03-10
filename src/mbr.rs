@@ -1,15 +1,11 @@
 use std::convert::TryFrom;
-use std::io::Error;
-use std::io::ErrorKind;
-use std::io::Result;
 
-use crate::le;
-use crate::Partition;
+use crate::{le, Error, Partition};
 
 const SECTOR_SIZE: usize = 512;
 
 /// Read a DOS/MBR partition table from a 512-byte boot sector, providing a disc sector size.
-pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition>> {
+pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition>, Error> {
     let mut partitions = Vec::with_capacity(4);
 
     for entry_id in 0..4 {
@@ -22,13 +18,12 @@ pub fn parse_partition_table(sector: &[u8; SECTOR_SIZE]) -> Result<Vec<Partition
             0x00 => false,
             0x80 => true,
             _ => {
-                return Err(Error::new(
-                    ErrorKind::InvalidData,
-                    format!(
+                return Err(Error::InvalidData {
+                    message: format!(
                         "invalid status code in partition {}: {:x}",
                         entry_id, status
                     ),
-                ))
+                });
             }
         };
 

@@ -13,7 +13,7 @@
 //! use std::io;
 //! use bootsector::{list_partitions, open_partition, Options, Attributes};
 //!
-//! # fn go<R>(mut reader: R) -> io::Result<()>
+//! # fn go<R>(mut reader: R) -> Result<(), bootsector::Error>
 //! # where R: positioned_io2::ReadAt {
 //! // let reader = ...;
 //! let partitions = list_partitions(&mut reader, &Options::default())?;
@@ -37,12 +37,15 @@
 //! # }
 //! ```
 
-use std::io;
+use snafu::prelude::*;
 
+mod errors;
 mod gpt;
 mod le;
 mod mbr;
 
+pub use crate::errors::Error;
+use crate::errors::*;
 pub use positioned_io2 as pio;
 
 /// Table-specific information about a partition.
@@ -138,16 +141,18 @@ impl Default for Options {
 /// * `ErrorKind::InvalidData` if anything is not as we expect,
 ///       including it looking like there should be GPT but its magic is missing.
 /// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
-pub fn list_partitions<R>(reader: R, options: &Options) -> io::Result<Vec<Partition>>
+pub fn list_partitions<R>(reader: R, options: &Options) -> Result<Vec<Partition>, Error>
 where
     R: pio::ReadAt,
 {
     let header_table = {
         let mut disc_header = [0u8; 512];
-        reader.read_exact_at(0, &mut disc_header)?;
+        reader
+            .read_exact_at(0, &mut disc_header)
+            .context(IoSnafu {})?;
 
         if 0x55 != disc_header[510] || 0xAA != disc_header[511] {
-            return Err(io::ErrorKind::NotFound.into());
+            return Err(Error::NotFound);
         }
 
         mbr::parse_partition_table(&disc_header)?
@@ -158,7 +163,7 @@ where
         _ => {
             return match options.mbr {
                 ReadMBR::Modern => Ok(header_table),
-                ReadMBR::Never => Err(io::ErrorKind::NotFound.into()),
+                ReadMBR::Never => Err(Error::NotFound),
             }
         }
     }
@@ -177,7 +182,7 @@ where
 }
 
 /// Open the contents of a partition for reading.
-pub fn open_partition<R>(inner: R, part: &Partition) -> io::Result<pio::Slice<R>>
+pub fn open_partition<R>(inner: R, part: &Partition) -> Result<pio::Slice<R>, Error>
 where
     R: pio::ReadAt,
 {

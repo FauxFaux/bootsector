@@ -1,10 +1,8 @@
 extern crate bootsector;
 
-use std::io;
-
-use bootsector::Attributes;
 use bootsector::Options;
 use bootsector::{list_partitions, Partition};
+use bootsector::{Attributes, Error};
 
 #[test]
 fn four_tee_gpt() {
@@ -144,15 +142,14 @@ fn require_gpt() {
     let mut options = Options::default();
     options.mbr = bootsector::ReadMBR::Never;
 
-    assert_eq!(
-        io::ErrorKind::NotFound,
+    assert!(matches!(
         list_partitions(
             cursor(include_bytes!("test-data/mbr-ubuntu-raspi3-16.04.img")),
             &options,
         )
-        .unwrap_err()
-        .kind()
-    );
+        .unwrap_err(),
+        Error::NotFound
+    ));
 }
 
 #[test]

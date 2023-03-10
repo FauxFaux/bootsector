@@ -1,14 +1,12 @@
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::io;
-use std::io::Error;
-use std::io::ErrorKind::InvalidData;
 
 use crc::Crc;
+use snafu::ResultExt;
 
-use crate::le;
-use crate::Attributes;
-use crate::Partition;
+use crate::errors::IoSnafu;
+use crate::{le, Attributes, Error, Partition};
 
 // Apparently we have to pick a name from a random page on sourceforge.
 // Random sourceforge page: https://reveng.sourceforge.io/crc-catalogue/all.htm
@@ -40,37 +38,41 @@ pub fn is_protective(partition: &Partition) -> bool {
     0 == partition.id && partition.first_byte <= MAXIMUM_SECTOR_SIZE
 }
 
-pub fn read<R>(mut reader: R, sector_size: u64) -> io::Result<Vec<Partition>>
+pub fn read<R>(mut reader: R, sector_size: u64) -> Result<Vec<Partition>, Error>
 where
     R: io::Read + io::Seek,
 {
-    reader.seek(io::SeekFrom::Start(sector_size))?;
+    reader
+        .seek(io::SeekFrom::Start(sector_size))
+        .context(IoSnafu {})?;
 
-    let sector_size_mem = usize::try_from(sector_size).map_err(|_| {
-        Error::new(
-            io::ErrorKind::InvalidInput,
-            "sector size is bigger than memory",
-        )
-    })?;
+    let sector_size_mem = usize::try_from(sector_size).map_err(|_| Error::BiggerThanMemory)?;
 
     let mut lba1 = vec![0u8; sector_size_mem];
-    reader.read_exact(&mut lba1)?;
+    reader.read_exact(&mut lba1).context(IoSnafu {})?;
 
     if b"EFI PART" != &lba1[0x00..0x08] {
-        return Err(Error::new(InvalidData, "bad EFI signature"));
+        return Err(Error::InvalidStatic {
+            message: "bad EFI signature",
+        });
     }
 
     if [0, 0, 1, 0] != lba1[0x08..0x0c] {
-        return Err(Error::new(InvalidData, "unsupported revision"));
+        return Err(Error::InvalidStatic {
+            message: "unsupported revision",
+        });
     }
 
     let header_size = le::read_u32(&lba1[0x0c..0x10]);
     if header_size < 92 {
-        return Err(Error::new(InvalidData, "header too short"));
+        return Err(Error::InvalidStatic {
+            message: "header too short",
+        });
     }
 
-    let header_size = usize::try_from(header_size)
-        .map_err(|_| Error::new(InvalidData, "header size must fit in memory"))?;
+    let header_size = usize::try_from(header_size).map_err(|_| Error::InvalidStatic {
+        message: "header size must fit in memory",
+    })?;
 
     let header_crc = le::read_u32(&lba1[0x10..0x14]);
 
@@ -80,21 +82,21 @@ where
     }
 
     if header_crc != CRC.checksum(&lba1[..header_size]) {
-        return Err(Error::new(InvalidData, "header checksum mismatch"));
+        return Err(Error::InvalidStatic {
+            message: "header checksum mismatch",
+        });
     }
 
     if 0 != le::read_u32(&lba1[0x14..0x18]) {
-        return Err(Error::new(
-            InvalidData,
-            "unsupported data in reserved field 0x0c",
-        ));
+        return Err(Error::InvalidStatic {
+            message: "unsupported data in reserved field 0x0c",
+        });
     }
 
     if 1 != le::read_u64(&lba1[0x18..0x20]) {
-        return Err(Error::new(
-            InvalidData,
-            "current lba must be '1' for first header",
-        ));
+        return Err(Error::InvalidStatic {
+            message: "current lba must be '1' for first header",
+        });
     }
 
     // backup lba [ignored]
@@ -103,58 +105,65 @@ where
     let last_usable_lba = le::read_u64(&lba1[0x30..0x38]);
 
     if first_usable_lba > last_usable_lba {
-        return Err(Error::new(InvalidData, "usable lbas are backwards?!"));
+        return Err(Error::InvalidStatic {
+            message: "usable lbas are backwards?!",
+        });
     }
 
     if last_usable_lba > (u64::MAX / u64::try_from(sector_size).expect("u64 conversion")) {
-        return Err(Error::new(
-            InvalidData,
-            "everything must be below the 2^64 point (~ eighteen million TB)",
-        ));
+        return Err(Error::InvalidStatic {
+            message: "everything must be below the 2^64 point (~ eighteen million TB)",
+        });
     }
 
     let mut guid = [0u8; 16];
     guid.copy_from_slice(&lba1[0x38..0x48]);
 
     if 2 != le::read_u64(&lba1[0x48..0x50]) {
-        return Err(Error::new(
-            InvalidData,
-            "starting lba must be '2' for first header",
-        ));
+        return Err(Error::InvalidStatic {
+            message: "starting lba must be '2' for first header",
+        });
     }
 
     let entries = le::read_u32(&lba1[0x50..0x54]);
 
-    let entries = u16::try_from(entries)
-        .map_err(|_| Error::new(InvalidData, "entry count is implausible"))?;
+    let entries = u16::try_from(entries).map_err(|_| Error::InvalidStatic {
+        message: "entry count is implausible",
+    })?;
 
     let entry_size = le::read_u32(&lba1[0x54..0x58]);
-    let entry_size = u16::try_from(entry_size)
-        .map_err(|_| Error::new(InvalidData, "entry size is implausibly large"))?;
+    let entry_size = u16::try_from(entry_size).map_err(|_| Error::InvalidStatic {
+        message: "entry size is implausibly large",
+    })?;
 
     if entry_size < 128 {
-        return Err(Error::new(InvalidData, "entry size is implausibly small"));
+        return Err(Error::InvalidStatic {
+            message: "entry size is implausibly small",
+        });
     }
 
     // TODO: off-by-1? Not super important.
     if first_usable_lba < 2 + ((u64::from(entry_size) * u64::from(entries)) / sector_size) {
-        return Err(Error::new(InvalidData, "first usable lba is too low"));
+        return Err(Error::InvalidStatic {
+            message: "first usable lba is too low",
+        });
     }
 
     let table_crc = le::read_u32(&lba1[0x58..0x5c]);
 
     if !all_zero(&lba1[header_size..]) {
-        return Err(Error::new(
-            InvalidData,
-            "reserved header tail is not all empty",
-        ));
+        return Err(Error::InvalidStatic {
+            message: "reserved header tail is not all empty",
+        });
     }
 
     let mut table = vec![0u8; usize::from(entry_size) * usize::from(entries)];
-    reader.read_exact(&mut table)?;
+    reader.read_exact(&mut table).context(IoSnafu {})?;
 
     if table_crc != CRC.checksum(&table) {
-        return Err(Error::new(InvalidData, "table crc invalid"));
+        return Err(Error::InvalidStatic {
+            message: "table crc invalid",
+        });
     }
 
     let mut ret = Vec::with_capacity(16);
@@ -173,7 +182,9 @@ where
         let last_lba = le::read_u64(&entry[0x28..0x30]);
 
         if first_lba > last_lba || first_lba < first_usable_lba || last_lba > last_usable_lba {
-            return Err(Error::new(InvalidData, "partition entry is out of range"));
+            return Err(Error::InvalidStatic {
+                message: "partition entry is out of range",
+            });
         }
 
         let attributes = entry[0x30..0x38].try_into().expect("fixed size slice");
@@ -186,10 +197,9 @@ where
         let name = match String::from_utf16(&name_le) {
             Ok(name) => name,
             Err(e) => {
-                return Err(Error::new(
-                    InvalidData,
-                    format!("partition {} has an invalid name: {:?}", id, e),
-                ));
+                return Err(Error::InvalidData {
+                    message: format!("partition {} has an invalid name: {:?}", id, e),
+                });
             }
         };
 
