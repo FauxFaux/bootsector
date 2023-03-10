@@ -38,14 +38,15 @@ pub fn is_protective(partition: &Partition) -> bool {
 
 pub fn read<R>(mut reader: R, sector_size: u64) -> Result<Vec<Partition>, Error>
 where
-    R: io::Read + io::Seek,
+    R: io::ReadAt,
 {
-    reader.seek(io::SeekFrom::Start(sector_size))?;
+    let mut pos = sector_size;
 
     let sector_size_mem = usize::try_from(sector_size).map_err(|_| Error::BiggerThanMemory)?;
 
     let mut lba1 = vec![0u8; sector_size_mem];
-    reader.read_exact(&mut lba1)?;
+    reader.read_exact_at(pos, &mut lba1)?;
+    pos += sector_size;
 
     if b"EFI PART" != &lba1[0x00..0x08] {
         return Err(Error::InvalidStatic {
@@ -153,8 +154,14 @@ where
         });
     }
 
-    let mut table = vec![0u8; usize::from(entry_size) * usize::from(entries)];
-    reader.read_exact(&mut table)?;
+    let mut table = vec![
+        0u8;
+        usize::from(entry_size)
+            .checked_mul(usize::from(entries))
+            .ok_or(Error::Overflow)?
+    ];
+    reader.read_exact_at(pos, &mut table)?;
+    pos += u64::try_from(table.len()).map_err(|_| Error::BiggerThanMemory)?;
 
     if table_crc != CRC.checksum(&table) {
         return Err(Error::InvalidStatic {

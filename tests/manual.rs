@@ -3,6 +3,7 @@ extern crate bootsector;
 use bootsector::Options;
 use bootsector::{list_partitions, Partition};
 use bootsector::{Attributes, Error};
+use std::io;
 
 #[test]
 fn four_tee_gpt() {

@@ -15,6 +15,8 @@ pub enum Error {
 
     NotFound,
 
+    Overflow,
+
     BiggerThanMemory,
 
     InvalidStatic {

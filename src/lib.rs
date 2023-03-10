@@ -147,16 +147,13 @@ impl Default for Options {
 /// * `ErrorKind::InvalidData` if anything is not as we expect,
 ///       including it looking like there should be GPT but its magic is missing.
 /// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
-#[cfg(feature = "std")]
-pub fn list_partitions<R>(reader: R, options: &Options) -> Result<Vec<Partition>, Error>
+pub fn list_partitions<R>(mut reader: R, options: &Options) -> Result<Vec<Partition>, Error>
 where
-    R: pio::ReadAt,
+    R: io::ReadAt,
 {
     let header_table = {
         let mut disc_header = [0u8; 512];
-        reader
-            .read_exact_at(0, &mut disc_header)
-            .context(IoSnafu {})?;
+        reader.read_exact_at(0, &mut disc_header)?;
 
         if 0x55 != disc_header[510] || 0xAA != disc_header[511] {
             return Err(Error::NotFound);
@@ -183,7 +180,7 @@ where
                 SectorSize::GuessOrAssume => header_table[0].first_byte,
             };
 
-            gpt::read(pio::Cursor::new(reader), sector_size)
+            gpt::read(reader, sector_size)
         }
     }
 }
