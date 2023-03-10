@@ -15,5 +15,5 @@ version = "0.2.0"
 edition = "2018"
 
 [dependencies]
-crc = "2"
+crc = "3"
 positioned-io2 = "0.3"
