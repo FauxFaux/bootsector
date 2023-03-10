@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use core::convert::TryInto;
 
 #[inline]
 pub fn read_u16(slice: &[u8]) -> u16 {

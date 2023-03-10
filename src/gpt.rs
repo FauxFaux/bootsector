@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
-use std::convert::TryInto;
+use core::convert::TryFrom;
+use core::convert::TryInto;
 use std::io;
 
 use crc::Crc;
