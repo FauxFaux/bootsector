@@ -16,9 +16,9 @@ edition = "2018"
 
 [features]
 default = ["std"]
-std = ["snafu/std"]
+std = ["snafu/std", "positioned-io2"]
 
 [dependencies]
 crc = "3"
-positioned-io2 = "0.3"
+positioned-io2 = { versrion = "0.3", optional = true }
 snafu = { version ="0.7.4", default-features = false, features = ["rust_1_46"] }

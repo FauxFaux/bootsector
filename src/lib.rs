@@ -12,12 +12,11 @@
 //!
 //! ```rust
 //! use std::io;
-//! use bootsector::{list_partitions, open_partition, Options, Attributes};
+//! use bootsector::{list_partitions, Options, Attributes};
 //!
-//! # fn go<R>(mut reader: R) -> Result<(), bootsector::Error>
-//! # where R: positioned_io2::ReadAt {
+//! # fn go(reader: &[u8]) -> Result<(), bootsector::Error> {
 //! // let reader = ...;
-//! let partitions = list_partitions(&mut reader, &Options::default())?;
+//! let partitions = list_partitions(reader, &Options::default())?;
 //! let part = &partitions[0];
 //!
 //! // See what type of partition this is
@@ -32,7 +31,8 @@
 //!     } => println!("mbr: {:x}", type_code),
 //! }
 //!
-//! let part_reader = open_partition(reader, part);
+//! #[cfg(feature = "std")]
+//! let part_reader = bootsector::open_partition(reader, part)?;
 //! // part_reader.read_exact(...
 //! # Ok(())
 //! # }
@@ -42,8 +42,6 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 
-use snafu::prelude::*;
-
 mod errors;
 pub mod gpt;
 pub mod io;
@@ -51,7 +49,7 @@ mod le;
 pub mod mbr;
 
 pub use crate::errors::Error;
-use crate::errors::*;
+#[cfg(feature = "positioned-io2")]
 pub use positioned_io2 as pio;
 
 /// Table-specific information about a partition.
@@ -147,7 +145,7 @@ impl Default for Options {
 /// * `ErrorKind::InvalidData` if anything is not as we expect,
 ///       including it looking like there should be GPT but its magic is missing.
 /// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
-pub fn list_partitions<R>(mut reader: R, options: &Options) -> Result<Vec<Partition>, Error>
+pub fn list_partitions<R>(reader: R, options: &Options) -> Result<Vec<Partition>, Error>
 where
     R: io::ReadAt,
 {
@@ -187,9 +185,13 @@ where
 
 /// Open the contents of a partition for reading.
 #[cfg(feature = "std")]
-pub fn open_partition<R>(inner: R, part: &Partition) -> Result<pio::Slice<R>, Error>
+pub fn open_partition<R>(inner: R, part: &Partition) -> Result<positioned_io2::Slice<R>, Error>
 where
-    R: pio::ReadAt,
+    R: positioned_io2::ReadAt,
 {
-    Ok(pio::Slice::new(inner, part.first_byte, Some(part.len)))
+    Ok(positioned_io2::Slice::new(
+        inner,
+        part.first_byte,
+        Some(part.len),
+    ))
 }

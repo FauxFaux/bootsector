@@ -6,16 +6,17 @@ use snafu::prelude::*;
 #[snafu(visibility(pub(crate)))]
 pub enum Error {
     #[cfg(feature = "std")]
-    #[snafu(display("I/O error: {}", source))]
+    #[snafu(display("Underlying IO error at {pos}: {source}"))]
     Io {
         source: std::io::Error,
+        pos: u64,
     },
-    #[cfg(not(feature = "std"))]
-    Io {},
 
     NotFound,
 
     Overflow,
+
+    UnexpectedEof,
 
     BiggerThanMemory,
 

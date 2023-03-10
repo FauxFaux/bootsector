@@ -36,17 +36,33 @@ pub fn is_protective(partition: &Partition) -> bool {
     0 == partition.id && partition.first_byte <= MAXIMUM_SECTOR_SIZE
 }
 
-pub fn read<R>(mut reader: R, sector_size: u64) -> Result<Vec<Partition>, Error>
+struct Cursor<R: io::ReadAt> {
+    inner: R,
+    pos: u64,
+}
+
+impl<R: io::ReadAt> Cursor<R> {
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error> {
+        let len = u64::try_from(buf.len()).map_err(|_| Error::BiggerThanMemory)?;
+        self.inner.read_exact_at(self.pos, buf)?;
+        self.pos += len;
+        Ok(())
+    }
+}
+
+pub fn read<R>(reader: R, sector_size: u64) -> Result<Vec<Partition>, Error>
 where
     R: io::ReadAt,
 {
-    let mut pos = sector_size;
+    let mut reader = Cursor {
+        inner: reader,
+        pos: sector_size,
+    };
 
     let sector_size_mem = usize::try_from(sector_size).map_err(|_| Error::BiggerThanMemory)?;
 
     let mut lba1 = vec![0u8; sector_size_mem];
-    reader.read_exact_at(pos, &mut lba1)?;
-    pos += sector_size;
+    reader.read_exact(&mut lba1)?;
 
     if b"EFI PART" != &lba1[0x00..0x08] {
         return Err(Error::InvalidStatic {
@@ -160,8 +176,7 @@ where
             .checked_mul(usize::from(entries))
             .ok_or(Error::Overflow)?
     ];
-    reader.read_exact_at(pos, &mut table)?;
-    pos += u64::try_from(table.len()).map_err(|_| Error::BiggerThanMemory)?;
+    reader.read_exact(&mut table)?;
 
     if table_crc != CRC.checksum(&table) {
         return Err(Error::InvalidStatic {

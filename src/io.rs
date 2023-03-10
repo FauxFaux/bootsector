@@ -1,40 +1,33 @@
-use positioned_io2 as pio;
-use snafu::prelude::*;
-
-use crate::errors::IoSnafu;
 use crate::Error;
 
 pub trait ReadAt {
     fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> Result<(), Error>;
 }
 
-pub trait ReadSeek {
-    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error>;
-    fn seek_abs(&mut self, pos: u64) -> Result<u64, Error>;
-}
-
 #[cfg(feature = "std")]
-impl<R: std::io::Read + std::io::Seek> ReadSeek for R {
-    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), Error> {
-        std::io::Read::read_exact(self, buf).context(IoSnafu {})
-    }
-
-    fn seek_abs(&mut self, pos: u64) -> Result<u64, Error> {
-        std::io::Seek::seek(self, std::io::SeekFrom::Start(pos)).context(IoSnafu {})
-    }
-}
-
-#[cfg(feature = "std")]
-impl<R: pio::ReadAt> ReadAt for R {
+impl<R: positioned_io2::ReadAt> ReadAt for R {
     fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> Result<(), Error> {
-        pio::ReadAt::read_exact_at(self, pos, buf).context(IoSnafu {})
+        use crate::errors::IoSnafu;
+        use snafu::prelude::*;
+        positioned_io2::ReadAt::read_exact_at(self, pos, buf).context(IoSnafu { pos })
     }
 }
 
-// #[cfg(feature = "std")]
-// impl<R: std::io::Read + std::io::Seek> ReadAt for R {
-//     fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> Result<(), Error> {
-//         self.seek(std::io::SeekFrom::Start(pos)).context(IoSnafu {})?;
-//         self.read_exact(buf).context(IoSnafu {})
-//     }
-// }
+#[cfg(not(feature = "std"))]
+impl<'a> ReadAt for &'a [u8] {
+    fn read_exact_at(&self, pos: u64, buf: &mut [u8]) -> Result<(), Error> {
+        use core::convert::TryFrom;
+        let read_len = u64::try_from(buf.len()).map_err(|_| Error::BiggerThanMemory)?;
+        let self_len = u64::try_from(self.len()).map_err(|_| Error::BiggerThanMemory)?;
+        if pos + read_len > self_len {
+            return Err(Error::UnexpectedEof);
+        }
+        let start = usize::try_from(pos).map_err(|_| Error::BiggerThanMemory)?;
+        let end = start
+            .checked_add(buf.len())
+            .ok_or(Error::BiggerThanMemory)?;
+
+        buf.copy_from_slice(&self[start..end]);
+        Ok(())
+    }
+}
