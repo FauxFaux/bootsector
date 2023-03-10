@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use snafu::prelude::*;
 
 #[derive(Debug, Snafu)]
@@ -8,6 +10,8 @@ pub enum Error {
     Io {
         source: std::io::Error,
     },
+    #[cfg(not(feature = "std"))]
+    Io {},
 
     NotFound,
 

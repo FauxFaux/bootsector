@@ -3,6 +3,7 @@
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap
 )]
+#![cfg_attr(not(feature = "std"), no_std)]
 //! Read basic MBR and GPT partition tables from a reader.
 //!
 //! # Examples
@@ -37,12 +38,17 @@
 //! # }
 //! ```
 
+extern crate alloc;
+
+use alloc::{string::String, vec::Vec};
+
 use snafu::prelude::*;
 
 mod errors;
-mod gpt;
+pub mod gpt;
+pub mod io;
 mod le;
-mod mbr;
+pub mod mbr;
 
 pub use crate::errors::Error;
 use crate::errors::*;
@@ -141,6 +147,7 @@ impl Default for Options {
 /// * `ErrorKind::InvalidData` if anything is not as we expect,
 ///       including it looking like there should be GPT but its magic is missing.
 /// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
+#[cfg(feature = "std")]
 pub fn list_partitions<R>(reader: R, options: &Options) -> Result<Vec<Partition>, Error>
 where
     R: pio::ReadAt,
@@ -182,6 +189,7 @@ where
 }
 
 /// Open the contents of a partition for reading.
+#[cfg(feature = "std")]
 pub fn open_partition<R>(inner: R, part: &Partition) -> Result<pio::Slice<R>, Error>
 where
     R: pio::ReadAt,

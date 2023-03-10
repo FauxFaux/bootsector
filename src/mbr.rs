@@ -1,3 +1,4 @@
+use alloc::{format, vec::Vec};
 use core::convert::TryFrom;
 
 use crate::{le, Error, Partition};

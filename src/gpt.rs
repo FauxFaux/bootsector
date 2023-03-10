@@ -1,12 +1,10 @@
+use alloc::{format, string::String, vec, vec::Vec};
 use core::convert::TryFrom;
 use core::convert::TryInto;
-use std::io;
 
 use crc::Crc;
-use snafu::ResultExt;
 
-use crate::errors::IoSnafu;
-use crate::{le, Attributes, Error, Partition};
+use crate::{io, le, Attributes, Error, Partition};
 
 // Apparently we have to pick a name from a random page on sourceforge.
 // Random sourceforge page: https://reveng.sourceforge.io/crc-catalogue/all.htm
@@ -42,14 +40,12 @@ pub fn read<R>(mut reader: R, sector_size: u64) -> Result<Vec<Partition>, Error>
 where
     R: io::Read + io::Seek,
 {
-    reader
-        .seek(io::SeekFrom::Start(sector_size))
-        .context(IoSnafu {})?;
+    reader.seek(io::SeekFrom::Start(sector_size))?;
 
     let sector_size_mem = usize::try_from(sector_size).map_err(|_| Error::BiggerThanMemory)?;
 
     let mut lba1 = vec![0u8; sector_size_mem];
-    reader.read_exact(&mut lba1).context(IoSnafu {})?;
+    reader.read_exact(&mut lba1)?;
 
     if b"EFI PART" != &lba1[0x00..0x08] {
         return Err(Error::InvalidStatic {
@@ -158,7 +154,7 @@ where
     }
 
     let mut table = vec![0u8; usize::from(entry_size) * usize::from(entries)];
-    reader.read_exact(&mut table).context(IoSnafu {})?;
+    reader.read_exact(&mut table)?;
 
     if table_crc != CRC.checksum(&table) {
         return Err(Error::InvalidStatic {
