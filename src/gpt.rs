@@ -110,7 +110,7 @@ where
         });
     }
 
-    if last_usable_lba > (u64::MAX / u64::try_from(sector_size).expect("u64 conversion")) {
+    if last_usable_lba > (u64::MAX / sector_size) {
         return Err(Error::InvalidStatic {
             message: "everything must be below the 2^64 point (~ eighteen million TB)",
         });
