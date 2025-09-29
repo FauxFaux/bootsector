@@ -145,7 +145,7 @@ impl Default for Options {
 /// * `ErrorKind::InvalidData` if anything is not as we expect,
 ///       including it looking like there should be GPT but its magic is missing.
 /// * Other IO errors directly from the underlying reader, including `UnexpectedEOF`.
-pub fn list_partitions<R>(reader: R, options: &Options) -> Result<Vec<Partition>, Error>
+pub fn list_partitions<R>(mut reader: R, options: &Options) -> Result<Vec<Partition>, Error>
 where
     R: io::ReadAt,
 {

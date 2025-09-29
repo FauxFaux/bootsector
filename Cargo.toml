@@ -12,7 +12,7 @@ readme = "README.md"
 repository = "https://github.com/FauxFaux/bootsector"
 version = "0.2.0"
 
-edition = "2018"
+edition = "2024"
 
 [features]
 default = ["std"]
@@ -20,5 +20,5 @@ std = ["snafu/std", "positioned-io2"]
 
 [dependencies]
 crc = "3"
-positioned-io2 = { versrion = "0.3", optional = true }
-snafu = { version ="0.7.4", default-features = false, features = ["rust_1_46"] }
+positioned-io2 = { version = "0.3", optional = true }
+snafu = { version ="0.8.9", default-features = false }
